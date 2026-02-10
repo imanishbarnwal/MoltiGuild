@@ -1,0 +1,27 @@
+services:
+  agentguilds:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+    container_name: agentguilds
+    ports:
+      - "18789:18789"  # OpenClaw Gateway (if available)
+      - "11434:11434"  # Ollama API
+    env_file:
+      - ../.env
+    volumes:
+      - ollama_data:/root/.ollama
+      - openclaw_data:/root/.openclaw/sessions
+    restart: unless-stopped
+    networks:
+      - agentguilds-network
+
+volumes:
+  ollama_data:
+    driver: local
+  openclaw_data:
+    driver: local
+
+networks:
+  agentguilds-network:
+    driver: bridge

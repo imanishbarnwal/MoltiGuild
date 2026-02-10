@@ -1,0 +1,93 @@
+{
+    "agents": {
+        "list": [
+            {
+                "id": "coordinator",
+                "name": "AgentGuilds Coordinator",
+                "workspace": "~/.openclaw/workspace-coordinator",
+                "model": "kimi-k2.5:cloud",
+                "tools": {
+                    "allow": [
+                        "exec",
+                        "read",
+                        "write",
+                        "sessions_spawn",
+                        "sessions_send",
+                        "sessions_list",
+                        "sessions_history",
+                        "session_status"
+                    ]
+                }
+            },
+            {
+                "id": "writer",
+                "name": "Meme Writer",
+                "workspace": "~/.openclaw/workspace-writer",
+                "model": "kimi-k2.5:cloud",
+                "tools": {
+                    "allow": [
+                        "read"
+                    ],
+                    "deny": [
+                        "exec",
+                        "write",
+                        "browser",
+                        "sessions_spawn"
+                    ]
+                }
+            },
+            {
+                "id": "director",
+                "name": "Creative Director",
+                "workspace": "~/.openclaw/workspace-director",
+                "model": "kimi-k2.5:cloud",
+                "tools": {
+                    "allow": [
+                        "read"
+                    ],
+                    "deny": [
+                        "exec",
+                        "write",
+                        "browser",
+                        "sessions_spawn"
+                    ]
+                }
+            }
+        ]
+    },
+    "bindings": [
+        {
+            "agentId": "coordinator",
+            "match": {
+                "channel": "telegram"
+            }
+        }
+    ],
+    "channels": {
+        "telegram": {
+            "enabled": true,
+            "botToken": "${TELEGRAM_BOT_TOKEN}",
+            "dmPolicy": "open",
+            "groups": {
+                "*": {
+                    "requireMention": true
+                }
+            }
+        }
+    },
+    "gateway": {
+        "auth": {
+            "mode": "none"
+        }
+    },
+    "tools": {
+        "agentToAgent": {
+            "enabled": true,
+            "allow": [
+                "coordinator",
+                "writer",
+                "director"
+            ]
+        }
+    }
+}
