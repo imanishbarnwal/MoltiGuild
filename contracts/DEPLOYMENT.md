@@ -1,38 +1,42 @@
 # GuildRegistry Deployment Summary
 
-## ✅ Deployment Successful (v2 - Fixed)
+## ✅ Deployment Successful (v3 - Guild System)
 
 **Date**: February 10, 2026  
 **Network**: Monad Testnet  
 **Chain ID**: 10143  
-**Version**: v2 (Bug Fix Release)
+**Version**: v3 (Guild System + Enhanced Views)
 
 ---
 
 ## 📍 Contract Information
 
-### Deployed Contract (v2)
-- **Contract Address**: `0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1`
-- **Explorer**: https://testnet.monad.xyz/address/0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1
+### Deployed Contract (v3)
+- **Contract Address**: `0x90f3608bfFae5D80F74F7070C670C6C3E3370098`
+- **Explorer**: https://testnet.monad.xyz/address/0x90f3608bfFae5D80F74F7070C670C6C3E3370098
 - **Contract Name**: GuildRegistry
 - **Solidity Version**: 0.8.27
 - **EVM Version**: Prague
 
-### What's Fixed in v2
-- ✅ **Critical Bug Fix**: `withdrawFees()` now only withdraws tracked fees
-- ✅ **Security**: Prevents accidental drainage of active mission escrows
-- ✅ **Reentrancy**: Added reset before transfer in fee withdrawal
+### What's New in v3
+- ✅ **Guild System**: Create guilds with categories and reputation tracking
+- ✅ **Mission Association**: Missions now belong to guilds
+- ✅ **Rating System**: Clients can rate completed missions (1-5 stars)
+- ✅ **Enhanced Views**: `getMission()` returns guildId, new `getGuild()` function
+- ✅ **Reputation**: `getGuildReputation()` for average ratings
+- ✅ **Security**: Fixed withdrawFees() bug from v1
 
 ### Deployment Details
 - **Deployer Address**: `0xf7D8E04f82d343B68a7545FF632e282B502800Fd`
 - **Coordinator**: `0xf7D8E04f82d343B68a7545FF632e282B502800Fd` (same as deployer)
-- **Gas Used**: 3,027,022 gas
+- **Gas Used**: 4,291,537 gas
 - **Gas Price**: 102 gwei (average)
-- **Deployment Cost**: 0.308756244 ETH
+- **Deployment Cost**: 0.437736774 ETH
 - **Transaction Hash**: Check broadcast logs
 
-### Previous Version (Deprecated)
-- ~~v1: `0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1`~~ - **DO NOT USE** (has withdrawFees() bug)
+### Previous Versions (Deprecated)
+- ~~v2: `0x90f3608bfFae5D80F74F7070C670C6C3E3370098`~~ - No guild system
+- ~~v1: `0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023`~~ - **DO NOT USE** (has withdrawFees() bug)
 
 ---
 
@@ -40,7 +44,7 @@
 
 ### Contract Address (Copy-Paste Ready)
 ```
-0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1
+0x90f3608bfFae5D80F74F7070C670C6C3E3370098
 ```
 
 ### RPC URL
@@ -62,29 +66,29 @@ https://testnet-rpc.monad.xyz
 #### View Functions
 ```bash
 # Get coordinator
-cast call 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 "coordinator()" --rpc-url https://testnet-rpc.monad.xyz
+cast call 0x90f3608bfFae5D80F74F7070C670C6C3E3370098 "coordinator()" --rpc-url https://testnet-rpc.monad.xyz
 
 # Get mission count
-cast call 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 "getMissionCount()" --rpc-url https://testnet-rpc.monad.xyz
+cast call 0x90f3608bfFae5D80F74F7070C670C6C3E3370098 "getMissionCount()" --rpc-url https://testnet-rpc.monad.xyz
 
 # Get agent count
-cast call 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 "getAgentCount()" --rpc-url https://testnet-rpc.monad.xyz
+cast call 0x90f3608bfFae5D80F74F7070C670C6C3E3370098 "getAgentCount()" --rpc-url https://testnet-rpc.monad.xyz
 
 # Get agent list
-cast call 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 "getAgentList()" --rpc-url https://testnet-rpc.monad.xyz
+cast call 0x90f3608bfFae5D80F74F7070C670C6C3E3370098 "getAgentList()" --rpc-url https://testnet-rpc.monad.xyz
 
 # Get total fees collected
-cast call 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 "totalFeesCollected()" --rpc-url https://testnet-rpc.monad.xyz
+cast call 0x90f3608bfFae5D80F74F7070C670C6C3E3370098 "totalFeesCollected()" --rpc-url https://testnet-rpc.monad.xyz
 
 # Get total missions completed
-cast call 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 "totalMissionsCompleted()" --rpc-url https://testnet-rpc.monad.xyz
+cast call 0x90f3608bfFae5D80F74F7070C670C6C3E3370098 "totalMissionsCompleted()" --rpc-url https://testnet-rpc.monad.xyz
 ```
 
 #### Write Functions (Requires Private Key)
 
 **Register as Agent**
 ```bash
-cast send 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 \
+cast send 0x90f3608bfFae5D80F74F7070C670C6C3E3370098 \
   "registerAgent(string,uint256)" \
   "AI Researcher" \
   1000000000000000000 \
@@ -95,7 +99,7 @@ cast send 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 \
 
 **Create Mission**
 ```bash
-cast send 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 \
+cast send 0x90f3608bfFae5D80F74F7070C670C6C3E3370098 \
   "createMission(bytes32)" \
   0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef \
   --value 5ether \
@@ -106,7 +110,7 @@ cast send 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 \
 
 **Get Mission Details**
 ```bash
-cast call 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 \
+cast call 0x90f3608bfFae5D80F74F7070C670C6C3E3370098 \
   "getMission(uint256)" \
   0 \
   --rpc-url https://testnet-rpc.monad.xyz

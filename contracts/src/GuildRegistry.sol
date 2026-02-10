@@ -267,6 +267,7 @@ contract GuildRegistry {
         view
         returns (
             address client,
+            uint256 guildId,
             bytes32 taskHash,
             uint256 budget,
             uint256 createdAt,
@@ -281,12 +282,39 @@ contract GuildRegistry {
 
         return (
             mission.client,
+            mission.guildId,
             mission.taskHash,
             mission.budget,
             mission.createdAt,
             mission.completedAt,
             mission.completed,
             mission.resultHashes
+        );
+    }
+
+    function getGuild(uint256 guildId)
+        external
+        view
+        returns (
+            string memory name,
+            string memory category,
+            address creator,
+            uint256 totalMissions,
+            uint256 ratingCount,
+            bool active
+        )
+    {
+        require(guildId < guildCount, "Invalid guild");
+
+        Guild storage guild = guilds[guildId];
+
+        return (
+            guild.name,
+            guild.category,
+            guild.creator,
+            guild.totalMissions,
+            guild.ratingCount,
+            guild.active
         );
     }
 

@@ -1,20 +1,20 @@
-# 🚀 GuildRegistry - Quick Deployment Reference (v2)
+# 🚀 GuildRegistry - Quick Deployment Reference (v3)
 
 ## Contract Address
 ```
-0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1
+0x90f3608bfFae5D80F74F7070C670C6C3E3370098
 ```
 
 ## Network Details
 - **Network**: Monad Testnet
 - **Chain ID**: 10143
 - **RPC URL**: https://testnet-rpc.monad.xyz
-- **Explorer**: https://testnet.monad.xyz/address/0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1
+- **Explorer**: https://testnet.monad.xyz/address/0x90f3608bfFae5D80F74F7070C670C6C3E3370098
 
 ## Version
-- **Version**: v2 (Bug Fix Release)
+- **Version**: v3 (Guild System + Enhanced Views)
 - **Date**: February 10, 2026
-- **What's Fixed**: withdrawFees() now only withdraws tracked fees (prevents escrow drainage)
+- **What's New**: Guild system, ratings, enhanced view functions
 
 ## Coordinator
 ```
@@ -22,11 +22,12 @@
 ```
 
 ## Deployment Stats
-- **Gas Used**: 3,027,022
-- **Cost**: 0.308756244 ETH
+- **Gas Used**: 4,291,537
+- **Cost**: 0.437736774 ETH
 
-## ⚠️ Previous Version (DO NOT USE)
+## ⚠️ Previous Versions (DO NOT USE)
 ```
+0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 (v2 - no guild system)
 0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023 (v1 - has withdrawFees() bug)
 ```
 
@@ -35,18 +36,30 @@
 ### View State
 ```bash
 # Coordinator
-cast call 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 "coordinator()" --rpc-url https://testnet-rpc.monad.xyz
+cast call 0x90f3608bfFae5D80F74F7070C670C6C3E3370098 "coordinator()" --rpc-url https://testnet-rpc.monad.xyz
+
+# Guild Count
+cast call 0x90f3608bfFae5D80F74F7070C670C6C3E3370098 "guildCount()" --rpc-url https://testnet-rpc.monad.xyz
 
 # Mission Count
-cast call 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 "getMissionCount()" --rpc-url https://testnet-rpc.monad.xyz
+cast call 0x90f3608bfFae5D80F74F7070C670C6C3E3370098 "getMissionCount()" --rpc-url https://testnet-rpc.monad.xyz
 
 # Agent Count
-cast call 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 "getAgentCount()" --rpc-url https://testnet-rpc.monad.xyz
+cast call 0x90f3608bfFae5D80F74F7070C670C6C3E3370098 "getAgentCount()" --rpc-url https://testnet-rpc.monad.xyz
+```
+
+### Create Guild
+```bash
+cast send 0x90f3608bfFae5D80F74F7070C670C6C3E3370098 \
+  "createGuild(string,string)" \
+  "Meme Lords" "meme" \
+  --rpc-url https://testnet-rpc.monad.xyz \
+  --private-key $DEPLOYER_PRIVATE_KEY --legacy
 ```
 
 ### Register Agent
 ```bash
-cast send 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 \
+cast send 0x90f3608bfFae5D80F74F7070C670C6C3E3370098 \
   "registerAgent(string,uint256)" \
   "AI Researcher" 1000000000000000000 \
   --rpc-url https://testnet-rpc.monad.xyz \
@@ -55,18 +68,18 @@ cast send 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 \
 
 ### Create Mission
 ```bash
-cast send 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 \
-  "createMission(bytes32)" \
-  0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef \
+cast send 0x90f3608bfFae5D80F74F7070C670C6C3E3370098 \
+  "createMission(uint256,bytes32)" \
+  0 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef \
   --value 5ether \
   --rpc-url https://testnet-rpc.monad.xyz \
   --private-key $DEPLOYER_PRIVATE_KEY --legacy
 ```
 
 ## Status
-✅ **DEPLOYED & VERIFIED (v2)**
+✅ **DEPLOYED & VERIFIED (v3)**
 - Coordinator: Active
-- Mission Count: 0
-- Agent Count: 0
-- Bug Fix: withdrawFees() secured
+- Guild System: Enabled
+- Rating System: Enabled
+- Enhanced Views: getMission (with guildId), getGuild
 - Ready for use!

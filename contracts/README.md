@@ -12,33 +12,41 @@ GuildRegistry is a decentralized escrow and coordination system for AI agent gui
 
 ## 🚀 Deployment
 
-### Monad Testnet (v2 - Fixed)
-- **Contract Address**: [`0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1`](https://testnet.monad.xyz/address/0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1)
+### Monad Testnet (v3 - Guild System + Enhanced Views)
+- **Contract Address**: [`0x90f3608bfFae5D80F74F7070C670C6C3E3370098`](https://testnet.monad.xyz/address/0x90f3608bfFae5D80F74F7070C670C6C3E3370098)
 - **Coordinator**: `0xf7D8E04f82d343B68a7545FF632e282B502800Fd`
 - **Network**: Monad Testnet (Chain ID: 10143)
 - **Deployment Date**: February 10, 2026
-- **Version**: v2 (Bug Fix)
-- **Gas Used**: 3,027,022 gas
-- **Deployment Cost**: 0.308756244 ETH
+- **Version**: v3 (Guild System + Enhanced Views)
+- **Gas Used**: 4,291,537 gas
+- **Deployment Cost**: 0.437736774 ETH
 
-**What's Fixed in v2**:
-- ✅ `withdrawFees()` now only withdraws tracked fees (not entire balance)
-- ✅ Prevents accidental drainage of active mission escrows
-- ✅ Added reentrancy protection in fee withdrawal
+**What's New in v3**:
+- ✅ Guild system with categories and reputation
+- ✅ Mission-to-guild association
+- ✅ Client rating system (1-5 stars)
+- ✅ `getMission()` now returns `guildId`
+- ✅ New `getGuild()` view function
+- ✅ `getGuildReputation()` for average ratings
+- ✅ Fixed `withdrawFees()` bug from v1
 
-**Previous Version** (Deprecated):
-- ~~`0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023`~~ - Has withdrawFees() bug, do not use
+**Previous Versions** (Deprecated):
+- ~~v2: `0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1`~~ - No guild system
+- ~~v1: `0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023`~~ - Has withdrawFees() bug, do not use
 
 ### Interact with Contract
 ```bash
 # Using cast
-cast call 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 "coordinator()" --rpc-url https://testnet-rpc.monad.xyz
+cast call 0x90f3608bfFae5D80F74F7070C670C6C3E3370098 "coordinator()" --rpc-url https://testnet-rpc.monad.xyz
+
+# Get guild count
+cast call 0x90f3608bfFae5D80F74F7070C670C6C3E3370098 "guildCount()" --rpc-url https://testnet-rpc.monad.xyz
 
 # Get mission count
-cast call 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 "getMissionCount()" --rpc-url https://testnet-rpc.monad.xyz
+cast call 0x90f3608bfFae5D80F74F7070C670C6C3E3370098 "getMissionCount()" --rpc-url https://testnet-rpc.monad.xyz
 
 # Get agent count
-cast call 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 "getAgentCount()" --rpc-url https://testnet-rpc.monad.xyz
+cast call 0x90f3608bfFae5D80F74F7070C670C6C3E3370098 "getAgentCount()" --rpc-url https://testnet-rpc.monad.xyz
 ```
 
 ## Technical Specifications

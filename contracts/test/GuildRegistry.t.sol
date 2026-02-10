@@ -166,7 +166,7 @@ contract GuildRegistryTest is Test {
         assertEq(registry.getMissionCount(), 1);
         assertEq(address(registry).balance, 5 ether);
         
-        (address missionClient, bytes32 storedTaskHash, uint256 budget, uint256 createdAt, 
+        (address missionClient, uint256 guildId, bytes32 storedTaskHash, uint256 budget, uint256 createdAt, 
          uint256 completedAt, bool completed, bytes32[] memory resultHashes) = registry.getMission(0);
         
         assertEq(missionClient, client);
@@ -251,7 +251,7 @@ contract GuildRegistryTest is Test {
         assertEq(agent2.balance, 2 ether);
         
         // Verify mission state
-        (, , , , uint256 completedAt, bool completed, bytes32[] memory storedResults) = 
+        (, , , , , uint256 completedAt, bool completed, bytes32[] memory storedResults) = 
             registry.getMission(missionId);
         assertTrue(completed);
         assertEq(completedAt, block.timestamp);
@@ -599,7 +599,7 @@ contract GuildRegistryTest is Test {
         vm.prank(newCoordinator);
         registry.completeMission(missionId, results, recipients, splits);
         
-        (, , , , , bool completed, ) = registry.getMission(missionId);
+        (, , , , , , bool completed, ) = registry.getMission(missionId);
         assertTrue(completed);
     }
 
