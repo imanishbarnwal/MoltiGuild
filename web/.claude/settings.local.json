@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir \"C:\\\\Users\\\\Home-PC\\\\MoltiGuild\")",
+      "Bash(dir:*)",
+      "Bash(npx create-next-app@14:*)",
+      "Bash(npm install:*)",
+      "Bash(npx next build:*)",
+      "Bash(npx next dev:*)",
+      "Bash(curl:*)",
+      "Bash(npx kill-port:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill:*)",
+      "Bash(tar:*)",
+      "Bash(sort:*)",
+      "Bash(/c/Python313/python.exe:*)",
+      "Bash(node:*)"
+    ]
+  }
+}
