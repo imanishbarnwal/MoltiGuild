@@ -541,7 +541,7 @@ contract GuildRegistryTest is Test {
     }
 
     function test_RevertWhen_WithdrawFeesNoBalance() public {
-        vm.expectRevert("No balance");
+        vm.expectRevert("No fees");
         registry.withdrawFees(payable(feeRecipient));
     }
 

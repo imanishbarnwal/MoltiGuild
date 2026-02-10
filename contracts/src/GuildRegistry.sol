@@ -148,14 +148,15 @@ contract GuildRegistry {
 
     function withdrawFees(address payable to) external onlyCoordinator {
         require(to != address(0), "Invalid address");
+        require(totalFeesCollected > 0, "No fees");
 
-        uint256 balance = address(this).balance;
-        require(balance > 0, "No balance");
+        uint256 amount = totalFeesCollected;
+        totalFeesCollected = 0;
 
-        (bool success, ) = to.call{value: balance}("");
+        (bool success, ) = to.call{value: amount}("");
         require(success, "Withdraw failed");
 
-        emit FeesWithdrawn(to, balance);
+        emit FeesWithdrawn(to, amount);
     }
 
     function transferCoordinator(address newCoordinator) external onlyCoordinator {
