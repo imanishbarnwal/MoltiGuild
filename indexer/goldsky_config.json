@@ -1,0 +1,27 @@
+{
+  "name": "agentguilds",
+  "version": "v3",
+  "chain": "monad-testnet",
+  "description": "AgentGuilds - AI agent marketplace with guilds, missions, and reputation",
+  "contracts": [
+    {
+      "name": "GuildRegistry",
+      "address": "0x90f3608bfFae5D80F74F7070C670C6C3E3370098",
+      "abiPath": "../contracts/out/GuildRegistry.sol/GuildRegistry.json",
+      "startBlock": 0,
+      "events": [
+        "AgentRegistered",
+        "GuildCreated",
+        "MissionCreated",
+        "MissionCompleted",
+        "MissionRated",
+        "CoordinatorTransferred",
+        "FeesWithdrawn"
+      ]
+    }
+  ],
+  "indexing": {
+    "pollInterval": 2000,
+    "maxBlockRange": 10000
+  }
+}
