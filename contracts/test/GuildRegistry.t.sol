@@ -14,9 +14,13 @@ contract GuildRegistryTest is Test {
     address public client;
     address public feeRecipient;
     
+    uint256 public defaultGuildId;
+    
     event AgentRegistered(address indexed agent, string capability, uint256 priceWei);
-    event MissionCreated(uint256 indexed missionId, address indexed client, bytes32 taskHash, uint256 budget);
-    event MissionCompleted(uint256 indexed missionId, bytes32[] resultHashes, uint256 totalPaid);
+    event GuildCreated(uint256 indexed guildId, string name, string category, address creator);
+    event MissionCreated(uint256 indexed missionId, uint256 indexed guildId, address indexed client, uint256 budget);
+    event MissionCompleted(uint256 indexed missionId, uint256 indexed guildId, uint256 totalPaid);
+    event MissionRated(uint256 indexed missionId, uint256 indexed guildId, uint8 score);
     event CoordinatorTransferred(address indexed oldCoordinator, address indexed newCoordinator);
     event FeesWithdrawn(address indexed to, uint256 amount);
 
@@ -29,6 +33,9 @@ contract GuildRegistryTest is Test {
         feeRecipient = makeAddr("feeRecipient");
         
         registry = new GuildRegistry();
+        
+        // Create a default guild for tests
+        defaultGuildId = registry.createGuild("Test Guild", "general");
     }
 
     // =========================
@@ -110,7 +117,7 @@ contract GuildRegistryTest is Test {
         // Create and complete a mission to increment mission count
         vm.deal(client, 10 ether);
         vm.prank(client);
-        uint256 missionId = registry.createMission{value: 5 ether}(keccak256("Task 1"));
+        uint256 missionId = registry.createMission{value: 5 ether}(defaultGuildId, keccak256("Task 1"));
         
         bytes32[] memory results = new bytes32[](1);
         results[0] = keccak256("Result");
@@ -152,8 +159,8 @@ contract GuildRegistryTest is Test {
         
         vm.prank(client);
         vm.expectEmit(true, true, false, true);
-        emit MissionCreated(0, client, taskHash, 5 ether);
-        uint256 missionId = registry.createMission{value: 5 ether}(taskHash);
+        emit MissionCreated(0, defaultGuildId, client, 5 ether);
+        uint256 missionId = registry.createMission{value: 5 ether}(defaultGuildId, taskHash);
         
         assertEq(missionId, 0);
         assertEq(registry.getMissionCount(), 1);
@@ -175,9 +182,9 @@ contract GuildRegistryTest is Test {
         vm.deal(client, 20 ether);
         
         vm.startPrank(client);
-        uint256 mission1 = registry.createMission{value: 5 ether}(keccak256("Task 1"));
-        uint256 mission2 = registry.createMission{value: 3 ether}(keccak256("Task 2"));
-        uint256 mission3 = registry.createMission{value: 7 ether}(keccak256("Task 3"));
+        uint256 mission1 = registry.createMission{value: 5 ether}(defaultGuildId, keccak256("Task 1"));
+        uint256 mission2 = registry.createMission{value: 3 ether}(defaultGuildId, keccak256("Task 2"));
+        uint256 mission3 = registry.createMission{value: 7 ether}(defaultGuildId, keccak256("Task 3"));
         vm.stopPrank();
         
         assertEq(mission1, 0);
@@ -190,7 +197,7 @@ contract GuildRegistryTest is Test {
     function test_RevertWhen_CreateMissionWithZeroValue() public {
         vm.prank(client);
         vm.expectRevert("Budget must be > 0");
-        registry.createMission{value: 0}(keccak256("Task 1"));
+        registry.createMission{value: 0}(defaultGuildId, keccak256("Task 1"));
     }
 
     function test_RevertWhen_GetMissionInvalidId() public {
@@ -199,7 +206,7 @@ contract GuildRegistryTest is Test {
         
         vm.deal(client, 5 ether);
         vm.prank(client);
-        registry.createMission{value: 5 ether}(keccak256("Task"));
+        registry.createMission{value: 5 ether}(defaultGuildId, keccak256("Task"));
         
         vm.expectRevert("Invalid mission ID");
         registry.getMission(1);
@@ -220,7 +227,7 @@ contract GuildRegistryTest is Test {
         // Create mission
         vm.deal(client, 10 ether);
         vm.prank(client);
-        uint256 missionId = registry.createMission{value: 5 ether}(keccak256("Task 1"));
+        uint256 missionId = registry.createMission{value: 5 ether}(defaultGuildId, keccak256("Task 1"));
         
         // Complete mission
         bytes32[] memory results = new bytes32[](2);
@@ -236,7 +243,7 @@ contract GuildRegistryTest is Test {
         splits[1] = 2 ether;
         
         vm.expectEmit(true, false, false, true);
-        emit MissionCompleted(missionId, results, 5 ether);
+        emit MissionCompleted(missionId, defaultGuildId, 5 ether);
         registry.completeMission(missionId, results, recipients, splits);
         
         // Verify payments
@@ -269,7 +276,7 @@ contract GuildRegistryTest is Test {
         
         vm.deal(client, 10 ether);
         vm.prank(client);
-        uint256 missionId = registry.createMission{value: 5 ether}(keccak256("Task"));
+        uint256 missionId = registry.createMission{value: 5 ether}(defaultGuildId, keccak256("Task"));
         
         bytes32[] memory results = new bytes32[](1);
         results[0] = keccak256("Result");
@@ -290,7 +297,7 @@ contract GuildRegistryTest is Test {
     function test_CompleteMission_NonRegisteredRecipient() public {
         vm.deal(client, 10 ether);
         vm.prank(client);
-        uint256 missionId = registry.createMission{value: 5 ether}(keccak256("Task"));
+        uint256 missionId = registry.createMission{value: 5 ether}(defaultGuildId, keccak256("Task"));
         
         bytes32[] memory results = new bytes32[](1);
         address[] memory recipients = new address[](1);
@@ -316,7 +323,7 @@ contract GuildRegistryTest is Test {
         
         vm.deal(client, 10 ether);
         vm.prank(client);
-        uint256 missionId = registry.createMission{value: 5 ether}(keccak256("Task"));
+        uint256 missionId = registry.createMission{value: 5 ether}(defaultGuildId, keccak256("Task"));
         
         bytes32[] memory results = new bytes32[](1);
         address[] memory recipients = new address[](1);
@@ -341,7 +348,7 @@ contract GuildRegistryTest is Test {
         
         vm.deal(client, 10 ether);
         vm.prank(client);
-        uint256 missionId = registry.createMission{value: 5 ether}(keccak256("Task"));
+        uint256 missionId = registry.createMission{value: 5 ether}(defaultGuildId, keccak256("Task"));
         
         bytes32[] memory results = new bytes32[](1);
         address[] memory recipients = new address[](1);
@@ -371,7 +378,7 @@ contract GuildRegistryTest is Test {
     function test_RevertWhen_CompleteMissionTwice() public {
         vm.deal(client, 10 ether);
         vm.prank(client);
-        uint256 missionId = registry.createMission{value: 5 ether}(keccak256("Task 1"));
+        uint256 missionId = registry.createMission{value: 5 ether}(defaultGuildId, keccak256("Task 1"));
         
         bytes32[] memory results = new bytes32[](1);
         results[0] = keccak256("Result");
@@ -391,7 +398,7 @@ contract GuildRegistryTest is Test {
     function test_RevertWhen_CompleteMissionLengthMismatch() public {
         vm.deal(client, 10 ether);
         vm.prank(client);
-        uint256 missionId = registry.createMission{value: 5 ether}(keccak256("Task"));
+        uint256 missionId = registry.createMission{value: 5 ether}(defaultGuildId, keccak256("Task"));
         
         bytes32[] memory results = new bytes32[](1);
         address[] memory recipients = new address[](2);
@@ -408,7 +415,7 @@ contract GuildRegistryTest is Test {
     function test_RevertWhen_CompleteMissionNoRecipients() public {
         vm.deal(client, 10 ether);
         vm.prank(client);
-        uint256 missionId = registry.createMission{value: 5 ether}(keccak256("Task"));
+        uint256 missionId = registry.createMission{value: 5 ether}(defaultGuildId, keccak256("Task"));
         
         bytes32[] memory results = new bytes32[](0);
         address[] memory recipients = new address[](0);
@@ -421,7 +428,7 @@ contract GuildRegistryTest is Test {
     function test_RevertWhen_CompleteMissionZeroRecipient() public {
         vm.deal(client, 10 ether);
         vm.prank(client);
-        uint256 missionId = registry.createMission{value: 5 ether}(keccak256("Task"));
+        uint256 missionId = registry.createMission{value: 5 ether}(defaultGuildId, keccak256("Task"));
         
         bytes32[] memory results = new bytes32[](1);
         address[] memory recipients = new address[](1);
@@ -437,7 +444,7 @@ contract GuildRegistryTest is Test {
     function test_RevertWhen_CompleteMissionSplitsExceedBudget() public {
         vm.deal(client, 10 ether);
         vm.prank(client);
-        uint256 missionId = registry.createMission{value: 5 ether}(keccak256("Task"));
+        uint256 missionId = registry.createMission{value: 5 ether}(defaultGuildId, keccak256("Task"));
         
         bytes32[] memory results = new bytes32[](2);
         address[] memory recipients = new address[](2);
@@ -455,7 +462,7 @@ contract GuildRegistryTest is Test {
     function test_RevertWhen_NonCoordinatorCompleteMission() public {
         vm.deal(client, 10 ether);
         vm.prank(client);
-        uint256 missionId = registry.createMission{value: 5 ether}(keccak256("Task 1"));
+        uint256 missionId = registry.createMission{value: 5 ether}(defaultGuildId, keccak256("Task 1"));
         
         bytes32[] memory results = new bytes32[](1);
         address[] memory recipients = new address[](1);
@@ -479,7 +486,7 @@ contract GuildRegistryTest is Test {
         
         vm.deal(client, 10 ether);
         vm.prank(client);
-        uint256 missionId = registry.createMission{value: 5 ether}(keccak256("Task"));
+        uint256 missionId = registry.createMission{value: 5 ether}(defaultGuildId, keccak256("Task"));
         
         bytes32[] memory results = new bytes32[](1);
         address[] memory recipients = new address[](1);
@@ -509,7 +516,7 @@ contract GuildRegistryTest is Test {
         // Mission 1: 1 ether fee
         vm.deal(client, 20 ether);
         vm.prank(client);
-        uint256 mission1 = registry.createMission{value: 5 ether}(keccak256("Task 1"));
+        uint256 mission1 = registry.createMission{value: 5 ether}(defaultGuildId, keccak256("Task 1"));
         
         bytes32[] memory results = new bytes32[](1);
         address[] memory recipients = new address[](1);
@@ -521,7 +528,7 @@ contract GuildRegistryTest is Test {
         
         // Mission 2: 2 ether fee
         vm.prank(client);
-        uint256 mission2 = registry.createMission{value: 7 ether}(keccak256("Task 2"));
+        uint256 mission2 = registry.createMission{value: 7 ether}(defaultGuildId, keccak256("Task 2"));
         
         splits[0] = 5 ether;
         registry.completeMission(mission2, results, recipients, splits);
@@ -575,7 +582,7 @@ contract GuildRegistryTest is Test {
         // Create mission
         vm.deal(client, 10 ether);
         vm.prank(client);
-        uint256 missionId = registry.createMission{value: 5 ether}(keccak256("Task"));
+        uint256 missionId = registry.createMission{value: 5 ether}(defaultGuildId, keccak256("Task"));
         
         // Old coordinator cannot complete
         bytes32[] memory results = new bytes32[](1);
@@ -646,9 +653,9 @@ contract GuildRegistryTest is Test {
         // 2. Client creates multiple missions
         vm.deal(client, 50 ether);
         vm.startPrank(client);
-        uint256 mission1 = registry.createMission{value: 10 ether}(keccak256("Mission 1"));
-        uint256 mission2 = registry.createMission{value: 15 ether}(keccak256("Mission 2"));
-        uint256 mission3 = registry.createMission{value: 8 ether}(keccak256("Mission 3"));
+        uint256 mission1 = registry.createMission{value: 10 ether}(defaultGuildId, keccak256("Mission 1"));
+        uint256 mission2 = registry.createMission{value: 15 ether}(defaultGuildId, keccak256("Mission 2"));
+        uint256 mission3 = registry.createMission{value: 8 ether}(defaultGuildId, keccak256("Mission 3"));
         vm.stopPrank();
         
         assertEq(registry.getMissionCount(), 3);
@@ -746,7 +753,7 @@ contract GuildRegistryTest is Test {
         // Complete first mission
         vm.deal(client, 10 ether);
         vm.prank(client);
-        uint256 mission1 = registry.createMission{value: 2 ether}(keccak256("Task 1"));
+        uint256 mission1 = registry.createMission{value: 2 ether}(defaultGuildId, keccak256("Task 1"));
         
         bytes32[] memory results = new bytes32[](1);
         address[] memory recipients = new address[](1);
@@ -770,7 +777,7 @@ contract GuildRegistryTest is Test {
         
         // Complete second mission
         vm.prank(client);
-        uint256 mission2 = registry.createMission{value: 3 ether}(keccak256("Task 2"));
+        uint256 mission2 = registry.createMission{value: 3 ether}(defaultGuildId, keccak256("Task 2"));
         
         registry.completeMission(mission2, results, recipients, splits);
         

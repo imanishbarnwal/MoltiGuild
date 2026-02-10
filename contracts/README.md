@@ -12,24 +12,33 @@ GuildRegistry is a decentralized escrow and coordination system for AI agent gui
 
 ## 🚀 Deployment
 
-### Monad Testnet
-- **Contract Address**: [`0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023`](https://testnet.monad.xyz/address/0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023)
+### Monad Testnet (v2 - Fixed)
+- **Contract Address**: [`0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1`](https://testnet.monad.xyz/address/0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1)
 - **Coordinator**: `0xf7D8E04f82d343B68a7545FF632e282B502800Fd`
 - **Network**: Monad Testnet (Chain ID: 10143)
-- **Deployment Date**: February 9, 2026
-- **Gas Used**: 3,023,961 gas
-- **Deployment Cost**: 0.308444022 ETH
+- **Deployment Date**: February 10, 2026
+- **Version**: v2 (Bug Fix)
+- **Gas Used**: 3,027,022 gas
+- **Deployment Cost**: 0.308756244 ETH
+
+**What's Fixed in v2**:
+- ✅ `withdrawFees()` now only withdraws tracked fees (not entire balance)
+- ✅ Prevents accidental drainage of active mission escrows
+- ✅ Added reentrancy protection in fee withdrawal
+
+**Previous Version** (Deprecated):
+- ~~`0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023`~~ - Has withdrawFees() bug, do not use
 
 ### Interact with Contract
 ```bash
 # Using cast
-cast call 0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023 "coordinator()" --rpc-url https://testnet-rpc.monad.xyz
+cast call 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 "coordinator()" --rpc-url https://testnet-rpc.monad.xyz
 
 # Get mission count
-cast call 0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023 "getMissionCount()" --rpc-url https://testnet-rpc.monad.xyz
+cast call 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 "getMissionCount()" --rpc-url https://testnet-rpc.monad.xyz
 
 # Get agent count
-cast call 0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023 "getAgentCount()" --rpc-url https://testnet-rpc.monad.xyz
+cast call 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 "getAgentCount()" --rpc-url https://testnet-rpc.monad.xyz
 ```
 
 ## Technical Specifications

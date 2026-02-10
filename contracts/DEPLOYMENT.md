@@ -1,29 +1,38 @@
 # GuildRegistry Deployment Summary
 
-## ✅ Deployment Successful
+## ✅ Deployment Successful (v2 - Fixed)
 
-**Date**: February 9, 2026  
+**Date**: February 10, 2026  
 **Network**: Monad Testnet  
-**Chain ID**: 10143
+**Chain ID**: 10143  
+**Version**: v2 (Bug Fix Release)
 
 ---
 
 ## 📍 Contract Information
 
-### Deployed Contract
-- **Contract Address**: `0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023`
-- **Explorer**: https://testnet.monad.xyz/address/0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023
+### Deployed Contract (v2)
+- **Contract Address**: `0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1`
+- **Explorer**: https://testnet.monad.xyz/address/0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1
 - **Contract Name**: GuildRegistry
 - **Solidity Version**: 0.8.27
 - **EVM Version**: Prague
 
+### What's Fixed in v2
+- ✅ **Critical Bug Fix**: `withdrawFees()` now only withdraws tracked fees
+- ✅ **Security**: Prevents accidental drainage of active mission escrows
+- ✅ **Reentrancy**: Added reset before transfer in fee withdrawal
+
 ### Deployment Details
 - **Deployer Address**: `0xf7D8E04f82d343B68a7545FF632e282B502800Fd`
 - **Coordinator**: `0xf7D8E04f82d343B68a7545FF632e282B502800Fd` (same as deployer)
-- **Gas Used**: 3,023,961 gas
+- **Gas Used**: 3,027,022 gas
 - **Gas Price**: 102 gwei (average)
-- **Deployment Cost**: 0.308444022 ETH
+- **Deployment Cost**: 0.308756244 ETH
 - **Transaction Hash**: Check broadcast logs
+
+### Previous Version (Deprecated)
+- ~~v1: `0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1`~~ - **DO NOT USE** (has withdrawFees() bug)
 
 ---
 
@@ -31,7 +40,7 @@
 
 ### Contract Address (Copy-Paste Ready)
 ```
-0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023
+0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1
 ```
 
 ### RPC URL
@@ -53,29 +62,29 @@ https://testnet-rpc.monad.xyz
 #### View Functions
 ```bash
 # Get coordinator
-cast call 0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023 "coordinator()" --rpc-url https://testnet-rpc.monad.xyz
+cast call 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 "coordinator()" --rpc-url https://testnet-rpc.monad.xyz
 
 # Get mission count
-cast call 0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023 "getMissionCount()" --rpc-url https://testnet-rpc.monad.xyz
+cast call 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 "getMissionCount()" --rpc-url https://testnet-rpc.monad.xyz
 
 # Get agent count
-cast call 0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023 "getAgentCount()" --rpc-url https://testnet-rpc.monad.xyz
+cast call 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 "getAgentCount()" --rpc-url https://testnet-rpc.monad.xyz
 
 # Get agent list
-cast call 0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023 "getAgentList()" --rpc-url https://testnet-rpc.monad.xyz
+cast call 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 "getAgentList()" --rpc-url https://testnet-rpc.monad.xyz
 
 # Get total fees collected
-cast call 0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023 "totalFeesCollected()" --rpc-url https://testnet-rpc.monad.xyz
+cast call 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 "totalFeesCollected()" --rpc-url https://testnet-rpc.monad.xyz
 
 # Get total missions completed
-cast call 0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023 "totalMissionsCompleted()" --rpc-url https://testnet-rpc.monad.xyz
+cast call 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 "totalMissionsCompleted()" --rpc-url https://testnet-rpc.monad.xyz
 ```
 
 #### Write Functions (Requires Private Key)
 
 **Register as Agent**
 ```bash
-cast send 0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023 \
+cast send 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 \
   "registerAgent(string,uint256)" \
   "AI Researcher" \
   1000000000000000000 \
@@ -86,7 +95,7 @@ cast send 0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023 \
 
 **Create Mission**
 ```bash
-cast send 0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023 \
+cast send 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 \
   "createMission(bytes32)" \
   0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef \
   --value 5ether \
@@ -97,7 +106,7 @@ cast send 0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023 \
 
 **Get Mission Details**
 ```bash
-cast call 0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023 \
+cast call 0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1 \
   "getMission(uint256)" \
   0 \
   --rpc-url https://testnet-rpc.monad.xyz

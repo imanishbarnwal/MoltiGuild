@@ -2,6 +2,11 @@
 pragma solidity ^0.8.27;
 
 contract GuildRegistry {
+
+    // =========================
+    // STRUCTS
+    // =========================
+
     struct Agent {
         address wallet;
         string capability;
@@ -10,8 +15,19 @@ contract GuildRegistry {
         bool active;
     }
 
+    struct Guild {
+        string name;
+        string category;
+        address creator;
+        uint256 totalMissions;
+        uint256 totalRatingSum;
+        uint256 ratingCount;
+        bool active;
+    }
+
     struct Mission {
         address client;
+        uint256 guildId;
         bytes32 taskHash;
         uint256 budget;
         uint256 createdAt;
@@ -20,18 +36,34 @@ contract GuildRegistry {
         bytes32[] resultHashes;
     }
 
+    // =========================
+    // STATE
+    // =========================
+
     address public coordinator;
 
     mapping(address => Agent) public agents;
     address[] public agentList;
+
+    mapping(uint256 => Guild) public guilds;
+    uint256 public guildCount;
+
     Mission[] public missions;
+
+    mapping(uint256 => uint8) public missionRatings;
 
     uint256 public totalFeesCollected;
     uint256 public totalMissionsCompleted;
 
+    // =========================
+    // EVENTS
+    // =========================
+
     event AgentRegistered(address indexed agent, string capability, uint256 priceWei);
-    event MissionCreated(uint256 indexed missionId, address indexed client, bytes32 taskHash, uint256 budget);
-    event MissionCompleted(uint256 indexed missionId, bytes32[] resultHashes, uint256 totalPaid);
+    event GuildCreated(uint256 indexed guildId, string name, string category, address creator);
+    event MissionCreated(uint256 indexed missionId, uint256 indexed guildId, address indexed client, uint256 budget);
+    event MissionCompleted(uint256 indexed missionId, uint256 indexed guildId, uint256 totalPaid);
+    event MissionRated(uint256 indexed missionId, uint256 indexed guildId, uint8 score);
     event CoordinatorTransferred(address indexed oldCoordinator, address indexed newCoordinator);
     event FeesWithdrawn(address indexed to, uint256 amount);
 
@@ -42,6 +74,33 @@ contract GuildRegistry {
 
     constructor() {
         coordinator = msg.sender;
+    }
+
+    // =========================
+    // GUILD LOGIC
+    // =========================
+
+    function createGuild(
+        string calldata name,
+        string calldata category
+    ) external returns (uint256 guildId) {
+        require(bytes(name).length > 0, "Empty name");
+
+        guildId = guildCount;
+
+        guilds[guildId] = Guild({
+            name: name,
+            category: category,
+            creator: msg.sender,
+            totalMissions: 0,
+            totalRatingSum: 0,
+            ratingCount: 0,
+            active: true
+        });
+
+        guildCount++;
+
+        emit GuildCreated(guildId, name, category, msg.sender);
     }
 
     // =========================
@@ -70,8 +129,14 @@ contract GuildRegistry {
     // MISSION LOGIC
     // =========================
 
-    function createMission(bytes32 taskHash) external payable returns (uint256 missionId) {
+    function createMission(
+        uint256 guildId,
+        bytes32 taskHash
+    ) external payable returns (uint256 missionId) {
+
         require(msg.value > 0, "Budget must be > 0");
+        require(guildId < guildCount, "Invalid guild");
+        require(guilds[guildId].active, "Guild inactive");
 
         missionId = missions.length;
 
@@ -79,12 +144,15 @@ contract GuildRegistry {
         Mission storage mission = missions[missionId];
 
         mission.client = msg.sender;
+        mission.guildId = guildId;
         mission.taskHash = taskHash;
         mission.budget = msg.value;
         mission.createdAt = block.timestamp;
         mission.completed = false;
 
-        emit MissionCreated(missionId, msg.sender, taskHash, msg.value);
+        guilds[guildId].totalMissions++;
+
+        emit MissionCreated(missionId, guildId, msg.sender, msg.value);
     }
 
     function completeMission(
@@ -93,6 +161,7 @@ contract GuildRegistry {
         address[] calldata recipients,
         uint256[] calldata splits
     ) external onlyCoordinator {
+
         require(missionId < missions.length, "Invalid mission ID");
 
         Mission storage mission = missions[missionId];
@@ -105,15 +174,11 @@ contract GuildRegistry {
 
         for (uint256 i = 0; i < splits.length; i++) {
             require(recipients[i] != address(0), "Zero recipient");
-
-            unchecked {
-                totalSplit += splits[i];
-            }
+            unchecked { totalSplit += splits[i]; }
         }
 
         require(totalSplit <= mission.budget, "Splits exceed budget");
 
-        // Effects
         mission.completed = true;
         mission.completedAt = block.timestamp;
         mission.resultHashes = resultHashes;
@@ -125,8 +190,8 @@ contract GuildRegistry {
             totalFeesCollected += fee;
         }
 
-        // Interactions
         for (uint256 i = 0; i < recipients.length; i++) {
+
             uint256 amount = splits[i];
 
             if (agents[recipients[i]].active) {
@@ -139,7 +204,32 @@ contract GuildRegistry {
             }
         }
 
-        emit MissionCompleted(missionId, resultHashes, totalSplit);
+        emit MissionCompleted(missionId, mission.guildId, totalSplit);
+    }
+
+    // =========================
+    // RATING LOGIC
+    // =========================
+
+    function rateMission(uint256 missionId, uint8 score) external {
+
+        require(score >= 1 && score <= 5, "Invalid score");
+        require(missionId < missions.length, "Invalid mission");
+
+        Mission storage mission = missions[missionId];
+
+        require(mission.completed, "Not completed");
+        require(msg.sender == mission.client, "Not client");
+        require(missionRatings[missionId] == 0, "Already rated");
+
+        missionRatings[missionId] = score;
+
+        Guild storage guild = guilds[mission.guildId];
+
+        guild.totalRatingSum += score;
+        guild.ratingCount += 1;
+
+        emit MissionRated(missionId, mission.guildId, score);
     }
 
     // =========================
@@ -198,6 +288,29 @@ contract GuildRegistry {
             mission.completed,
             mission.resultHashes
         );
+    }
+
+    function getGuildReputation(uint256 guildId)
+        external
+        view
+        returns (
+            uint256 avgRatingScaled,
+            uint256 totalMissions
+        )
+    {
+        require(guildId < guildCount, "Invalid guild");
+
+        Guild storage guild = guilds[guildId];
+
+        if (guild.ratingCount == 0) {
+            return (0, guild.totalMissions);
+        }
+
+        avgRatingScaled =
+            (guild.totalRatingSum * 100) /
+            guild.ratingCount;
+
+        return (avgRatingScaled, guild.totalMissions);
     }
 
     function getMissionCount() external view returns (uint256) {
