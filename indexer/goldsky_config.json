@@ -1,17 +1,17 @@
 {
-  "version": "1",
-  "name": "agentguilds",
-  "abis": {
-    "GuildRegistry": {
-      "path": "../contracts/out/GuildRegistry.sol/GuildRegistry.json"
-    }
-  },
-  "instances": [
-    {
-      "abi": "GuildRegistry",
-      "address": "0x90f3608bfFae5D80F74F7070C670C6C3E3370098",
-      "startBlock": 0,
-      "chain": "monad-testnet"
-    }
-  ]
+    "version": "1",
+    "name": "agentguilds",
+    "abis": {
+        "GuildRegistry": {
+            "path": "../contracts/out/GuildRegistry.sol/GuildRegistry.json"
+        }
+    },
+    "instances": [
+        {
+            "abi": "GuildRegistry",
+            "address": "0x8bA3B00dA262BdE62ae727e07907b5D7d991e885",
+            "startBlock": 11878000,
+            "chain": "monad-testnet"
+        }
+    ]
 }
