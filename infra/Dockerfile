@@ -20,17 +20,13 @@ RUN curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/downloa
 # Install Tailscale
 RUN curl -fsSL https://tailscale.com/install.sh | sh
 
-# Note: OpenClaw needs to be built from source
-# We'll handle this in the entrypoint script
-
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
-RUN npm install
-
-# Copy application files
+# Copy application files (respects .dockerignore)
 COPY . .
+
+# Install script dependencies
+RUN cd /app/scripts && npm install --production
 
 # Expose ports
 # 18789 - OpenClaw Gateway
@@ -38,8 +34,6 @@ COPY . .
 # 3001  - Coordinator API
 EXPOSE 18789 11434 3001
 
-# Copy and set entrypoint
-COPY infra/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-ENTRYPOINT ["/entrypoint.sh"]
+# Set entrypoint
+RUN chmod +x /app/infra/entrypoint.sh
+ENTRYPOINT ["/app/infra/entrypoint.sh"]

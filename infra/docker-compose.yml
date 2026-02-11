@@ -51,6 +51,9 @@ services:
   # ═══════════════════════════════════════
   # FULL STACK: OpenClaw + AI agents + tunnels
   # Only needed for conversational AI experience
+  #
+  # Mount openclaw-repo if you have it:
+  #   docker compose --profile full up
   # ═══════════════════════════════════════
   openclaw:
     profiles: ["full"]
@@ -65,13 +68,9 @@ services:
     volumes:
       - ollama_data:/root/.ollama
       - openclaw_data:/root/.openclaw/sessions
-      - tailscale_data:/var/lib/tailscale
       - app_data:/app/data
-    devices:
-      - /dev/net/tun:/dev/net/tun
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
+      # Mount openclaw-repo from host if available:
+      # - ../openclaw-repo:/app/openclaw-repo
     depends_on:
       api:
         condition: service_healthy
@@ -79,6 +78,12 @@ services:
     dns:
       - 8.8.8.8
       - 8.8.4.4
+    # Uncomment for Tailscale VPN support (Linux only):
+    # devices:
+    #   - /dev/net/tun:/dev/net/tun
+    # cap_add:
+    #   - NET_ADMIN
+    #   - NET_RAW
 
 volumes:
   app_data:
@@ -86,6 +91,4 @@ volumes:
   ollama_data:
     driver: local
   openclaw_data:
-    driver: local
-  tailscale_data:
     driver: local
