@@ -53,6 +53,15 @@ if [ -d "/app/openclaw-repo" ]; then
     pnpm start doctor --fix 2>&1 | tail -n 10 || true
 fi
 
+# ═══════════════════════════════════════
+# INSTALL CLAWHUB SKILLS
+# ═══════════════════════════════════════
+
+echo "Installing Clawhub skills..."
+npm i -g clawhub 2>/dev/null || true
+clawhub install monad-development --force 2>/dev/null || true
+echo "✓ Skills installed: agentguilds (local), monad-development (clawhub)"
+
 # Using Ollama Cloud API directly (no local Ollama needed)
 echo "Using Ollama Cloud API at https://ollama.com"
 echo "Model: gpt-oss:120b (cloud)"

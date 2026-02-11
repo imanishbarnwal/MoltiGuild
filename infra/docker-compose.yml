@@ -1,17 +1,67 @@
+# MoltiGuild Modular Docker Compose
+#
+# Usage:
+#   docker compose up api              # API only (lightweight)
+#   docker compose up api tg-bot       # API + Telegram bot
+#   docker compose --profile full up   # Everything (OpenClaw + API + tunnels)
+#
+# The API is always required. Everything else is optional.
+
 services:
-  agentguilds:
+  # ═══════════════════════════════════════
+  # COORDINATOR API (lightweight, always needed)
+  # ═══════════════════════════════════════
+  api:
     build:
       context: ..
-      dockerfile: infra/Dockerfile
-    container_name: agentguilds
+      dockerfile: deploy/api/Dockerfile
+    container_name: moltiguild-api
     ports:
-      - "18789:18789"  # OpenClaw Gateway
-      - "3001:3001"    # Coordinator API
+      - "3001:3001"
     env_file:
       - ../.env
     environment:
-      - CF_TUNNEL_TOKEN=${CF_TUNNEL_TOKEN:-}
-      - TS_AUTHKEY=${TS_AUTHKEY:-}
+      - DATA_DIR=/app/data
+    volumes:
+      - app_data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/status"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ═══════════════════════════════════════
+  # TELEGRAM BOT (lightweight, optional)
+  # ═══════════════════════════════════════
+  tg-bot:
+    build:
+      context: ..
+      dockerfile: deploy/tg-bot/Dockerfile
+    container_name: moltiguild-tg-bot
+    env_file:
+      - ../.env
+    environment:
+      - API_URL=http://api:3001
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ═══════════════════════════════════════
+  # FULL STACK: OpenClaw + AI agents + tunnels
+  # Only needed for conversational AI experience
+  # ═══════════════════════════════════════
+  openclaw:
+    profiles: ["full"]
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+    container_name: moltiguild-openclaw
+    ports:
+      - "18789:18789"
+    env_file:
+      - ../.env
     volumes:
       - ollama_data:/root/.ollama
       - openclaw_data:/root/.openclaw/sessions
@@ -22,23 +72,20 @@ services:
     cap_add:
       - NET_ADMIN
       - NET_RAW
+    depends_on:
+      api:
+        condition: service_healthy
     restart: unless-stopped
     dns:
       - 8.8.8.8
       - 8.8.4.4
-    networks:
-      - agentguilds-network
 
 volumes:
+  app_data:
+    driver: local
   ollama_data:
     driver: local
   openclaw_data:
     driver: local
   tailscale_data:
     driver: local
-  app_data:
-    driver: local
-
-networks:
-  agentguilds-network:
-    driver: bridge

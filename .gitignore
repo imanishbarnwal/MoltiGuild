@@ -31,9 +31,10 @@ contracts/lib/
 # Docker
 *.log
 
-# IDE
+# IDE / Tools
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 *~

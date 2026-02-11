@@ -13,12 +13,20 @@
  *   POST /api/join-guild       - Join a guild (on-chain v4)
  *   POST /api/leave-guild      - Leave a guild (on-chain v4)
  *   POST /api/deposit          - Deposit MON (on-chain v4)
+ *   POST /api/create-pipeline  - Create multi-agent mission (intra-guild)
+ *   GET  /api/pipeline/:id     - Pipeline status
+ *   GET  /api/pipelines        - All pipelines
+ *   GET  /api/missions/next    - Missions awaiting next step (for agents)
  *   GET  /api/missions/open    - Browse open missions
  *   GET  /api/agents/online    - Online agents
  *   GET  /api/guilds           - Browse guilds
  *   GET  /api/guilds/:id/agents - Guild members (on-chain v4)
  *   GET  /api/status           - Platform stats
  *   GET  /api/balance/:address - User deposit balance (v4)
+ *   GET  /api/events           - SSE event stream (real-time updates)
+ *   POST /api/admin/create-mission - Create mission (admin key)
+ *   POST /api/admin/rate-mission   - Rate mission (admin key)
+ *   POST /api/admin/create-guild   - Create guild (admin key)
  */
 
 const express = require('express');
@@ -31,7 +39,30 @@ require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const app = express();
 app.use(express.json());
 
-const PORT = process.env.API_PORT || 3001;
+// CORS - allow web dashboards and bots to call the API
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, X-Admin-Key');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+    next();
+});
+
+const PORT = process.env.PORT || process.env.API_PORT || 3001;
+const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
+
+// ═══════════════════════════════════════
+// SSE EVENT STREAM
+// ═══════════════════════════════════════
+
+const sseClients = new Set();
+
+function broadcast(event, data) {
+    const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+    for (const res of sseClients) {
+        res.write(payload);
+    }
+}
 
 // ═══════════════════════════════════════
 // PERSISTENT STATE (JSON files)
@@ -62,6 +93,12 @@ function saveJSON(filename, data) {
 
 function getHeartbeats() { return loadJSON('heartbeats.json'); }
 function saveHeartbeats(data) { saveJSON('heartbeats.json', data); }
+function getPipelines() { return loadJSON('pipelines.json'); }
+function savePipelines(data) { saveJSON('pipelines.json', data); }
+
+let pipelineCounter = 0;
+try { pipelineCounter = Object.keys(getPipelines()).length; } catch {}
+
 
 // ═══════════════════════════════════════
 // SIGNATURE VERIFICATION
@@ -115,6 +152,7 @@ app.post('/api/heartbeat', requireAuth('heartbeat'), async (req, res) => {
             timestamp: new Date().toISOString(),
         };
         saveHeartbeats(heartbeats);
+        broadcast('heartbeat', { agent: req.agentAddress, timestamp: new Date().toISOString() });
         res.json({ ok: true, message: 'Heartbeat recorded' });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
@@ -130,6 +168,7 @@ app.post('/api/join-guild', requireAuth('join-guild'), async (req, res) => {
         }
         // v4: on-chain guild membership
         const result = await monad.joinGuild(parseInt(guildId));
+        broadcast('agent_joined_guild', { agent: req.agentAddress, guildId: parseInt(guildId), ...result });
         res.json({ ok: true, data: { guildId, agent: req.agentAddress, ...result } });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
@@ -144,6 +183,7 @@ app.post('/api/leave-guild', requireAuth('leave-guild'), async (req, res) => {
             return res.status(400).json({ ok: false, error: 'Missing guildId' });
         }
         const result = await monad.leaveGuild(parseInt(guildId));
+        broadcast('agent_left_guild', { agent: req.agentAddress, guildId: parseInt(guildId), ...result });
         res.json({ ok: true, data: { guildId, agent: req.agentAddress, ...result } });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
@@ -159,13 +199,82 @@ app.post('/api/claim-mission', requireAuth('claim-mission'), async (req, res) =>
         }
         // v4: on-chain mission claiming with budget check
         const result = await monad.claimMission(parseInt(missionId));
+        broadcast('mission_claimed', { missionId: parseInt(missionId), agent: req.agentAddress, ...result });
         res.json({ ok: true, data: { missionId, agent: req.agentAddress, ...result } });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
     }
 });
 
+// POST /api/create-pipeline - Intra-guild multi-agent mission
+// Creates ONE on-chain mission. Multiple agents in the same guild
+// collaborate in steps. Coordinator completes with multi-agent splits.
+app.post('/api/create-pipeline', async (req, res) => {
+    try {
+        const { guildId, steps, task, budget } = req.body;
+        if (guildId === undefined) return res.status(400).json({ ok: false, error: 'Missing guildId' });
+        if (!steps || !Array.isArray(steps) || steps.length < 2) {
+            return res.status(400).json({ ok: false, error: 'Need at least 2 steps (e.g. [{ "role": "writer" }, { "role": "designer" }])' });
+        }
+        if (!task) return res.status(400).json({ ok: false, error: 'Missing task description' });
+        if (!budget) return res.status(400).json({ ok: false, error: 'Missing budget (in MON, e.g. "0.01")' });
+
+        const pipelineId = `pipeline-${++pipelineCounter}`;
+        const budgetWei = monad.parseEther(budget);
+        const taskHash = monad.hashTask(task);
+        const gid = parseInt(guildId);
+
+        // Create ONE on-chain mission for this guild
+        const txResult = await monad.createMission(gid, taskHash, budgetWei);
+        const missionCount = Number(await monad.readContract('getMissionCount'));
+        const missionId = missionCount - 1;
+
+        // Store pipeline state off-chain
+        const pipelines = getPipelines();
+        pipelines[pipelineId] = {
+            id: pipelineId,
+            missionId,
+            guildId: gid,
+            task,
+            budget,
+            steps: steps.map((s, i) => ({
+                step: i + 1,
+                role: s.role || `Step ${i + 1}`,
+                status: i === 0 ? 'awaiting_claim' : 'pending',
+                agent: null,
+                result: null,
+            })),
+            currentStep: 1,
+            totalSteps: steps.length,
+            status: 'active',
+            contributors: [], // { agent, role, result, resultHash }
+            createdAt: new Date().toISOString(),
+        };
+        savePipelines(pipelines);
+
+        broadcast('pipeline_created', { pipelineId, missionId, guildId: gid, task, totalSteps: steps.length, budget });
+        res.json({
+            ok: true,
+            data: {
+                pipelineId,
+                missionId,
+                guildId: gid,
+                totalSteps: steps.length,
+                currentStep: 1,
+                currentRole: steps[0].role,
+                budget: `${budget} MON`,
+                ...txResult,
+            },
+        });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
 // POST /api/submit-result
+// For pipeline missions: if not the last step, stores partial result and
+// opens next step. If last step, completes on-chain with all contributors.
+// For standalone missions: completes immediately (single agent, 90% split).
 app.post('/api/submit-result', requireAuth('submit-result'), async (req, res) => {
     try {
         const { missionId, resultData } = req.body;
@@ -173,34 +282,136 @@ app.post('/api/submit-result', requireAuth('submit-result'), async (req, res) =>
             return res.status(400).json({ ok: false, error: 'Missing missionId or resultData' });
         }
 
-        // v4: verify claimer on-chain
-        const claimer = await monad.getMissionClaim(parseInt(missionId));
+        const mid = parseInt(missionId);
+        const resultHash = monad.hashResult(resultData);
+
+        // Check if this mission is part of a pipeline
+        const pipelines = getPipelines();
+        let pipeline = null;
+        let pipelineId = null;
+        for (const [pid, p] of Object.entries(pipelines)) {
+            if (p.missionId === mid && p.status === 'active') {
+                pipeline = p;
+                pipelineId = pid;
+                break;
+            }
+        }
+
+        if (pipeline) {
+            // ── PIPELINE MISSION: intra-guild multi-agent ──
+            const stepIdx = pipeline.currentStep - 1;
+            const step = pipeline.steps[stepIdx];
+
+            // Record this agent's contribution
+            step.status = 'completed';
+            step.agent = req.agentAddress;
+            step.result = resultData;
+            pipeline.contributors.push({
+                agent: req.agentAddress,
+                role: step.role,
+                result: resultData,
+                resultHash,
+            });
+
+            const isLastStep = pipeline.currentStep >= pipeline.totalSteps;
+
+            if (!isLastStep) {
+                // Open next step
+                const nextStep = pipeline.steps[pipeline.currentStep];
+                nextStep.status = 'awaiting_claim';
+                nextStep.previousResult = resultData;
+                pipeline.currentStep += 1;
+                savePipelines(pipelines);
+
+                broadcast('step_completed', {
+                    pipelineId, missionId: mid, agent: req.agentAddress,
+                    completedStep: step.step, completedRole: step.role,
+                    nextStep: nextStep.step, nextRole: nextStep.role,
+                    totalSteps: pipeline.totalSteps,
+                });
+                return res.json({
+                    ok: true,
+                    data: {
+                        missionId: mid,
+                        resultHash,
+                        pipeline: {
+                            pipelineId,
+                            completedStep: step.step,
+                            completedRole: step.role,
+                            nextStep: nextStep.step,
+                            nextRole: nextStep.role,
+                            totalSteps: pipeline.totalSteps,
+                            status: 'next_step_open',
+                        },
+                    },
+                });
+            }
+
+            // ── LAST STEP: complete on-chain with all contributors ──
+            const allHashes = pipeline.contributors.map(c => c.resultHash);
+            const allAgents = pipeline.contributors.map(c => c.agent);
+            const budget = (await monad.readContract('getMission', [BigInt(mid)])).budget;
+            const agentPool = (budget * 90n) / 100n; // 90% to agents
+            const perAgent = agentPool / BigInt(allAgents.length); // equal split
+
+            // On-chain claim is by first agent; coordinator completes with all splits
+            const txResult = await monad.completeMission(mid, allHashes, allAgents, allAgents.map(() => perAgent));
+
+            pipeline.status = 'completed';
+            pipeline.completedAt = new Date().toISOString();
+            savePipelines(pipelines);
+
+            broadcast('pipeline_completed', {
+                pipelineId, missionId: mid,
+                contributors: pipeline.contributors.map(c => ({ agent: c.agent, role: c.role })),
+                totalSteps: pipeline.totalSteps,
+                ...txResult,
+            });
+            return res.json({
+                ok: true,
+                data: {
+                    missionId: mid,
+                    resultHash,
+                    ...txResult,
+                    pipeline: {
+                        pipelineId,
+                        status: 'completed',
+                        totalSteps: pipeline.totalSteps,
+                        contributors: pipeline.contributors.map(c => ({
+                            agent: c.agent,
+                            role: c.role,
+                            paid: monad.formatEther(perAgent) + ' MON',
+                        })),
+                    },
+                },
+            });
+        }
+
+        // ── STANDALONE MISSION: single agent ──
+        const claimer = await monad.getMissionClaim(mid);
         if (claimer === '0x0000000000000000000000000000000000000000') {
             return res.status(400).json({ ok: false, error: 'Mission not claimed yet' });
         }
 
-        const resultHash = monad.hashResult(resultData);
-
-        // Get mission budget from on-chain
-        const mission = await monad.readContract('getMission', [BigInt(missionId)]);
+        const mission = await monad.readContract('getMission', [BigInt(mid)]);
         if (mission.completed) {
             return res.status(409).json({ ok: false, error: 'Mission already completed' });
         }
 
         const budget = mission.budget;
-        const agentSplit = (budget * 90n) / 100n; // 90% to agent
+        const agentSplit = (budget * 90n) / 100n;
 
-        const txResult = await monad.completeMission(
-            parseInt(missionId),
-            [resultHash],
-            [claimer],
-            [agentSplit],
-        );
+        const txResult = await monad.completeMission(mid, [resultHash], [claimer], [agentSplit]);
 
+        broadcast('mission_completed', {
+            missionId: mid, agent: claimer,
+            paid: monad.formatEther(agentSplit) + ' MON',
+            ...txResult,
+        });
         res.json({
             ok: true,
             data: {
-                missionId,
+                missionId: mid,
                 resultHash,
                 agentPaid: monad.formatEther(agentSplit) + ' MON',
                 claimer,
@@ -225,8 +436,176 @@ app.post('/api/deposit', requireAuth('deposit'), async (req, res) => {
 });
 
 // ═══════════════════════════════════════
+// ADMIN ENDPOINTS (API key auth)
+// ═══════════════════════════════════════
+
+function requireAdmin(req, res, next) {
+    const key = req.headers['x-admin-key'] || req.body.apiKey;
+    if (!ADMIN_API_KEY || key !== ADMIN_API_KEY) {
+        return res.status(401).json({ ok: false, error: 'Invalid or missing admin API key' });
+    }
+    next();
+}
+
+// POST /api/admin/create-mission - Create a standalone mission (coordinator signs on-chain)
+app.post('/api/admin/create-mission', requireAdmin, async (req, res) => {
+    try {
+        const { guildId, task, budget } = req.body;
+        if (guildId === undefined || !task || !budget) {
+            return res.status(400).json({ ok: false, error: 'Missing guildId, task, or budget' });
+        }
+        const taskHash = monad.hashTask(task);
+        const budgetWei = monad.parseEther(budget);
+        const txResult = await monad.createMission(parseInt(guildId), taskHash, budgetWei);
+        const missionCount = Number(await monad.readContract('getMissionCount'));
+        const missionId = missionCount - 1;
+
+        broadcast('mission_created', { missionId, guildId: parseInt(guildId), task, budget });
+        res.json({ ok: true, data: { missionId, guildId: parseInt(guildId), task, taskHash, budget: `${budget} MON`, ...txResult } });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// POST /api/admin/rate-mission - Rate a completed mission
+app.post('/api/admin/rate-mission', requireAdmin, async (req, res) => {
+    try {
+        const { missionId, score } = req.body;
+        if (missionId === undefined || score === undefined) {
+            return res.status(400).json({ ok: false, error: 'Missing missionId or score' });
+        }
+        const s = parseInt(score);
+        if (s < 1 || s > 5) {
+            return res.status(400).json({ ok: false, error: 'Score must be 1-5' });
+        }
+        const txResult = await monad.rateMission(parseInt(missionId), s);
+
+        broadcast('mission_rated', { missionId: parseInt(missionId), score: s, ...txResult });
+        res.json({ ok: true, data: { missionId: parseInt(missionId), score: s, ...txResult } });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// POST /api/admin/create-guild - Create a new guild
+app.post('/api/admin/create-guild', requireAdmin, async (req, res) => {
+    try {
+        const { name, category } = req.body;
+        if (!name || !category) {
+            return res.status(400).json({ ok: false, error: 'Missing name or category' });
+        }
+        const txResult = await monad.createGuild(name, category);
+        const guildCount = Number(await monad.readContract('guildCount'));
+
+        broadcast('guild_created', { guildId: guildCount - 1, name, category });
+        res.json({ ok: true, data: { guildId: guildCount - 1, name, category, ...txResult } });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// ═══════════════════════════════════════
 // GET ENDPOINTS (public)
 // ═══════════════════════════════════════
+
+// GET /api/pipeline/:id - Pipeline status
+app.get('/api/pipeline/:id', async (req, res) => {
+    try {
+        const pipelines = getPipelines();
+        const pipeline = pipelines[req.params.id];
+        if (!pipeline) return res.status(404).json({ ok: false, error: 'Pipeline not found' });
+        res.json({ ok: true, data: pipeline });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// GET /api/pipelines - All pipelines
+app.get('/api/pipelines', async (req, res) => {
+    try {
+        const pipelines = getPipelines();
+        const list = Object.values(pipelines).map(p => ({
+            id: p.id,
+            task: p.task,
+            status: p.status,
+            guildId: p.guildId,
+            missionId: p.missionId,
+            currentStep: p.currentStep,
+            totalSteps: p.totalSteps,
+            createdAt: p.createdAt,
+        }));
+        res.json({ ok: true, data: { count: list.length, pipelines: list } });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// GET /api/missions/next?guildId=X - Missions awaiting next pipeline step
+// Agents poll this to find work within their guild that needs continuation
+app.get('/api/missions/next', async (req, res) => {
+    try {
+        const { guildId } = req.query;
+        const pipelines = getPipelines();
+
+        const awaiting = [];
+        for (const pipeline of Object.values(pipelines)) {
+            if (pipeline.status !== 'active') continue;
+            if (guildId !== undefined && pipeline.guildId !== parseInt(guildId)) continue;
+
+            const stepIdx = pipeline.currentStep - 1;
+            const step = pipeline.steps[stepIdx];
+            if (step && step.status === 'awaiting_claim') {
+                awaiting.push({
+                    pipelineId: pipeline.id,
+                    missionId: pipeline.missionId,
+                    guildId: pipeline.guildId,
+                    task: pipeline.task,
+                    step: step.step,
+                    totalSteps: pipeline.totalSteps,
+                    role: step.role,
+                    previousResult: step.previousResult || null,
+                    budget: pipeline.budget,
+                });
+            }
+        }
+
+        res.json({ ok: true, data: { count: awaiting.length, missions: awaiting } });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// GET /api/mission-context/:missionId - Get pipeline context for a mission
+app.get('/api/mission-context/:missionId', async (req, res) => {
+    try {
+        const missionId = parseInt(req.params.missionId);
+        const pipelines = getPipelines();
+
+        for (const pipeline of Object.values(pipelines)) {
+            if (pipeline.missionId !== missionId) continue;
+            if (pipeline.status !== 'active') continue;
+
+            const stepIdx = pipeline.currentStep - 1;
+            const step = pipeline.steps[stepIdx];
+            return res.json({
+                ok: true,
+                data: {
+                    pipelineId: pipeline.id,
+                    task: pipeline.task,
+                    step: step.step,
+                    totalSteps: pipeline.totalSteps,
+                    role: step.role,
+                    previousResult: step.previousResult || null,
+                    previousSteps: pipeline.contributors,
+                },
+            });
+        }
+
+        res.json({ ok: true, data: null }); // Not part of a pipeline
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
 
 // GET /api/status
 app.get('/api/status', async (req, res) => {
@@ -359,6 +738,39 @@ app.get('/api/balance/:address', async (req, res) => {
 });
 
 // ═══════════════════════════════════════
+// SSE ENDPOINT
+// ═══════════════════════════════════════
+
+// GET /api/events - Server-Sent Events stream
+// Clients connect and receive real-time updates for all platform activity.
+// Optional query params: ?guildId=0 to filter events for a specific guild.
+app.get('/api/events', (req, res) => {
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+    });
+
+    // Send initial connection event
+    res.write(`event: connected\ndata: ${JSON.stringify({ message: 'Connected to MoltiGuild event stream', timestamp: new Date().toISOString() })}\n\n`);
+
+    sseClients.add(res);
+    console.log(`SSE client connected (${sseClients.size} total)`);
+
+    // Keepalive every 30s
+    const keepalive = setInterval(() => {
+        res.write(': keepalive\n\n');
+    }, 30000);
+
+    req.on('close', () => {
+        clearInterval(keepalive);
+        sseClients.delete(res);
+        console.log(`SSE client disconnected (${sseClients.size} total)`);
+    });
+});
+
+// ═══════════════════════════════════════
 // START SERVER
 // ═══════════════════════════════════════
 
@@ -371,4 +783,6 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`  POST /api/claim-mission, /api/submit-result, /api/deposit`);
     console.log(`  GET  /api/status, /api/missions/open, /api/agents/online`);
     console.log(`  GET  /api/guilds, /api/guilds/:id/agents, /api/balance/:addr`);
+    console.log(`  GET  /api/events (SSE stream)`);
+    console.log(`  POST /api/admin/* (admin key: ${ADMIN_API_KEY ? 'configured' : 'NOT SET'})`);
 });

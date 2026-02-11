@@ -34,10 +34,7 @@
                         "read",
                         "write",
                         "sessions_spawn",
-                        "sessions_send",
-                        "sessions_list",
-                        "sessions_history",
-                        "session_status"
+                        "sessions_send"
                     ]
                 }
             },
@@ -75,6 +72,9 @@
             }
         ]
     },
+    "session": {
+        "dmScope": "per-channel-peer"
+    },
     "bindings": [
         {
             "agentId": "coordinator",
@@ -100,9 +100,15 @@
     },
     "gateway": {
         "mode": "local",
+        "bind": "lan",
+        "trustedProxies": ["127.0.0.1/8", "172.16.0.0/12", "10.0.0.0/8"],
         "controlUi": {
             "dangerouslyDisableDeviceAuth": true,
             "allowInsecureAuth": true
+        },
+        "auth": {
+            "mode": "token",
+            "token": "agentguilds-gateway-2026"
         }
     },
     "tools": {
@@ -113,6 +119,11 @@
                 "writer",
                 "director"
             ]
+        }
+    },
+    "skills": {
+        "load": {
+            "extraDirs": ["/app/skills"]
         }
     },
     "plugins": {

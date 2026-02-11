@@ -743,7 +743,7 @@ async function requestFaucet(address) {
     const res = await fetch(FAUCET_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address }),
+        body: JSON.stringify({ address, chainId: CHAIN_ID }),
     });
 
     const data = await res.json();
