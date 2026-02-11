@@ -7,6 +7,10 @@ export class CameraController {
   private dragStartY = 0;
   private minZoom = 0.5;
   private maxZoom = 2;
+  private enabled = true;
+
+  /** Screen-space exclusion zone (minimap) where drag should not start. */
+  private exclusionZone: { x: number; y: number; w: number; h: number } | null = null;
 
   constructor(private scene: Phaser.Scene, worldWidth: number, worldHeight: number) {
     this.camera = scene.cameras.main;
@@ -23,14 +27,31 @@ export class CameraController {
     this.setupScrollZoom();
   }
 
+  /** Set a screen-space rect where drag-pan should be suppressed. */
+  setExclusionZone(x: number, y: number, w: number, h: number): void {
+    this.exclusionZone = { x, y, w, h };
+  }
+
+  private isInExclusionZone(pointer: Phaser.Input.Pointer): boolean {
+    if (!this.exclusionZone) return false;
+    const z = this.exclusionZone;
+    return pointer.x >= z.x && pointer.x <= z.x + z.w &&
+           pointer.y >= z.y && pointer.y <= z.y + z.h;
+  }
+
   private setupDragPan(): void {
     this.scene.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      if (!this.enabled) return;
+      // Don't start drag if clicking on minimap
+      if (this.isInExclusionZone(pointer)) return;
+
       this.isDragging = true;
       this.dragStartX = pointer.worldX;
       this.dragStartY = pointer.worldY;
     });
 
     this.scene.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      if (!this.enabled) return;
       if (!pointer.isDown || !this.isDragging) return;
 
       const dx = this.dragStartX - pointer.worldX;
@@ -52,6 +73,7 @@ export class CameraController {
       _deltaX: number,
       deltaY: number,
     ) => {
+      if (!this.enabled) return;
       const zoomFactor = deltaY > 0 ? 0.9 : 1.1;
       const newZoom = Phaser.Math.Clamp(
         this.camera.zoom * zoomFactor,
@@ -60,6 +82,15 @@ export class CameraController {
       );
       this.camera.zoom = newZoom;
     });
+  }
+
+  disable(): void {
+    this.enabled = false;
+    this.isDragging = false;
+  }
+
+  enable(): void {
+    this.enabled = true;
   }
 
   centerOn(x: number, y: number): void {

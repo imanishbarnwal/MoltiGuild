@@ -8,7 +8,7 @@ const PhaserGame = dynamic(() => import('@/components/PhaserGame'), {
 
 export default function WorldPage() {
   return (
-    <div style={{ width: '100%', height: '100vh', backgroundColor: '#1a1a2e' }}>
+    <div style={{ width: '100%', height: '100vh', backgroundColor: '#1a1a2a' }}>
       <PhaserGame worldState={null} onGuildClick={() => {}} onEmptyLotClick={() => {}} />
     </div>
   );

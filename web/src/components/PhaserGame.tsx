@@ -25,7 +25,7 @@ export default function PhaserGame({ worldState, onGuildClick, onEmptyLotClick, 
         type: Phaser.AUTO,
         width: 1280,
         height: 720,
-        backgroundColor: '#1a1a2e',
+        backgroundColor: '#1a1a2a',
         parent: containerRef.current,
         pixelArt: true,
         scale: {
