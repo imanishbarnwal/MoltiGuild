@@ -22,7 +22,7 @@ AgentGuilds is three things at once:
 
 ## 🚀 Quick Start
 
-**Current Status:** See [STATUS.md](STATUS.md) for latest updates
+**Current Status:** V4 contract deployed, Goldsky v5 indexed, coordinator API live
 
 ### Prerequisites
 
@@ -168,49 +168,34 @@ User rates: 5 ⭐
 ```
 agentguilds/
 ├── agents/                    # AI agent configurations
-│   ├── coordinator/          # Orchestrator agent
-│   │   ├── SOUL.md          # Personality & instructions
-│   │   └── AGENTS.md        # Config
+│   ├── coordinator/          # Orchestrator agent (SOUL.md + AGENTS.md)
 │   ├── writer/              # Creative text agent
 │   └── director/            # Visual concept agent
 │
 ├── contracts/                # Smart contracts (Foundry)
-│   ├── src/
-│   │   └── GuildRegistry.sol
+│   ├── src/GuildRegistry.sol # V4 contract (deployed on Monad testnet)
 │   └── test/
-│       └── GuildRegistry.t.sol
 │
 ├── indexer/                  # Goldsky subgraph config
-│   └── goldsky_config.json
 │
 ├── scripts/                  # Backend scripts
-│   ├── coordinator.js       # CLI bridge: agents → chain
-│   └── lib/
-│       └── monad.js         # Blockchain interactions (viem)
+│   ├── monad.js             # Blockchain library (viem + Goldsky)
+│   ├── coordinator.js       # CLI for on-chain operations
+│   ├── api.js               # Express API server for external agents
+│   ├── test-monad.js        # Unit tests (Goldsky + RPC)
+│   └── test-e2e.js          # E2E mission lifecycle tests
+│
+├── skills/                   # Public skill definitions
+│   └── agentguilds/SKILL.md # External agent integration guide
 │
 ├── web/                      # Frontend (Next.js + Phaser.js)
-│   ├── src/
-│   │   ├── app/             # Next.js pages
-│   │   ├── game/            # Phaser.js world renderer
-│   │   ├── lib/             # GraphQL, world-state, contract
-│   │   └── components/      # React UI panels
-│   └── public/
-│       └── tilemap.json     # Isometric world layout
 │
-├── assets/                   # Sprite assets
-│   ├── tiles/               # Ground tiles
-│   ├── buildings/           # Agent buildings by tier
-│   ├── guildhalls/          # Guild halls by tier
-│   ├── decorations/         # Banners, lights
-│   └── effects/             # Animations
+├── assets/                   # Pixel art sprites
 │
 ├── infra/                    # Docker & deployment
 │   ├── Dockerfile
 │   ├── docker-compose.yml
 │   └── entrypoint.sh
-│
-├── skill/                    # ClawHub skill definition
-│   └── SKILL.md
 │
 ├── openclaw.config.json      # OpenClaw agent config
 ├── .env.example              # Environment template
