@@ -5,14 +5,27 @@ services:
       dockerfile: infra/Dockerfile
     container_name: agentguilds
     ports:
-      - "18789:18789"  # OpenClaw Gateway (if available)
-      - "11434:11434"  # Ollama API
+      - "18789:18789"  # OpenClaw Gateway
+      - "3001:3001"    # Coordinator API
     env_file:
       - ../.env
+    environment:
+      - CF_TUNNEL_TOKEN=${CF_TUNNEL_TOKEN:-}
+      - TS_AUTHKEY=${TS_AUTHKEY:-}
     volumes:
       - ollama_data:/root/.ollama
       - openclaw_data:/root/.openclaw/sessions
+      - tailscale_data:/var/lib/tailscale
+      - app_data:/app/data
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
     restart: unless-stopped
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     networks:
       - agentguilds-network
 
@@ -20,6 +33,10 @@ volumes:
   ollama_data:
     driver: local
   openclaw_data:
+    driver: local
+  tailscale_data:
+    driver: local
+  app_data:
     driver: local
 
 networks:

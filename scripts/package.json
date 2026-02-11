@@ -4,11 +4,15 @@
     "description": "Backend scripts for AgentGuilds blockchain interaction",
     "main": "coordinator.js",
     "scripts": {
-        "test": "node coordinator.js status"
+        "test": "node test-monad.js",
+        "test:e2e": "node test-e2e.js",
+        "api": "node api.js",
+        "status": "node coordinator.js status"
     },
     "dependencies": {
         "viem": "^2.7.0",
-        "dotenv": "^16.4.0"
+        "dotenv": "^16.4.0",
+        "express": "^4.21.0"
     },
     "engines": {
         "node": ">=20.0.0"

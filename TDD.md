@@ -1373,7 +1373,7 @@ The bridge between OpenClaw agents and the blockchain. Called via `exec` by the 
 //   node coordinator.js status
 //   node coordinator.js guild-info --category meme
 
-const { createMission, completeMission, rateMission, getGuildInfo, getStatus } = require('./lib/monad');
+const { createMission, completeMission, rateMission, getGuildInfo, getStatus } = require('./monad');
 
 const [,, command, ...args] = process.argv;
 const flags = parseFlags(args);
@@ -1424,7 +1424,7 @@ main().catch(e => console.log(JSON.stringify({ ok: false, error: e.message })));
 ### 10.2 monad.js (~130 lines)
 
 ```javascript
-// scripts/lib/monad.js
+// scripts/monad.js
 // All blockchain interactions via viem
 
 const { createPublicClient, createWalletClient, http, parseEther, keccak256, toBytes } = require('viem');
@@ -1694,7 +1694,7 @@ goldsky subgraph deploy agentguilds/v1 --from-abi ./goldsky_config.json
 | `goldsky_config.json` | 20 | A | Instant subgraph config |
 | **scripts/** | | **Person B** | |
 | `coordinator.js` | 70 | B | CLI bridge: agents → chain |
-| `lib/monad.js` | 130 | B | All viem blockchain calls |
+| `monad.js` | 130 | B | All viem blockchain calls |
 | `deploy.js` | 40 | B | Contract deployment script |
 | `register-agents.js` | 35 | B | Initial agent + guild registration |
 | **web/** | | **Person B** | |
