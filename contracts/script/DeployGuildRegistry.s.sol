@@ -10,7 +10,9 @@ contract DeployGuildRegistry is Script {
         
         vm.startBroadcast(deployerPrivateKey);
         
-        GuildRegistry registry = new GuildRegistry();
+        address coordinator = 0xf7D8E04f82d343B68a7545FF632e282B502800Fd;
+        
+        GuildRegistry registry = new GuildRegistry(coordinator);
         
         console.log("GuildRegistry deployed at:", address(registry));
         console.log("Coordinator:", registry.coordinator());

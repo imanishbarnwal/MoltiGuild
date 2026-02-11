@@ -9,6 +9,7 @@ contract GuildRegistry {
 
     struct Agent {
         address wallet;
+        address owner;
         string capability;
         uint256 priceWei;
         uint256 missionsCompleted;
@@ -22,6 +23,8 @@ contract GuildRegistry {
         uint256 totalMissions;
         uint256 totalRatingSum;
         uint256 ratingCount;
+        uint256 acceptedMissions;
+        uint256 disputedMissions;
         bool active;
     }
 
@@ -33,6 +36,8 @@ contract GuildRegistry {
         uint256 createdAt;
         uint256 completedAt;
         bool completed;
+        bool rated;
+        uint8 rating;
         bytes32[] resultHashes;
     }
 
@@ -42,38 +47,98 @@ contract GuildRegistry {
 
     address public coordinator;
 
-    mapping(address => Agent) public agents;
-    address[] public agentList;
-
     mapping(uint256 => Guild) public guilds;
     uint256 public guildCount;
 
+    mapping(address => Agent) public agents;
+    address[] public agentList;
+
     Mission[] public missions;
 
-    mapping(uint256 => uint8) public missionRatings;
+    mapping(string => uint256[]) public guildsByCategory;
 
     uint256 public totalFeesCollected;
-    uint256 public totalMissionsCompleted;
+
+    // V4 New State Variables
+    mapping(uint256 => address[]) internal _guildAgents;
+    mapping(address => uint256[]) internal _agentGuilds;
+    mapping(uint256 => mapping(address => bool)) public isAgentInGuild;
+    mapping(address => mapping(uint256 => bool)) internal _agentInGuildCheck;
+    
+    mapping(uint256 => address) public missionClaims;
+    
+    mapping(address => uint256) public userBalances;
+    
+    uint256 public missionTimeout;
 
     // =========================
     // EVENTS
     // =========================
 
-    event AgentRegistered(address indexed agent, string capability, uint256 priceWei);
-    event GuildCreated(uint256 indexed guildId, string name, string category, address creator);
-    event MissionCreated(uint256 indexed missionId, uint256 indexed guildId, address indexed client, uint256 budget);
-    event MissionCompleted(uint256 indexed missionId, uint256 indexed guildId, uint256 totalPaid);
-    event MissionRated(uint256 indexed missionId, uint256 indexed guildId, uint8 score);
-    event CoordinatorTransferred(address indexed oldCoordinator, address indexed newCoordinator);
-    event FeesWithdrawn(address indexed to, uint256 amount);
+    event GuildCreated(
+        uint256 indexed guildId,
+        string name,
+        string category,
+        address creator
+    );
+
+    event AgentRegistered(
+        address indexed wallet,
+        string capability,
+        uint256 priceWei
+    );
+
+    event MissionCreated(
+        uint256 indexed missionId,
+        address indexed client,
+        uint256 indexed guildId,
+        bytes32 taskHash,
+        uint256 budget
+    );
+
+    event MissionCompleted(
+        uint256 indexed missionId,
+        uint256 indexed guildId,
+        bytes32[] resultHashes
+    );
+
+    event MissionRated(
+        uint256 indexed missionId,
+        uint256 indexed guildId,
+        uint8 score
+    );
+
+    event MissionDisputed(
+        uint256 indexed missionId,
+        uint256 indexed guildId
+    );
+
+    event CoordinatorTransferred(
+        address indexed oldCoord,
+        address indexed newCoord
+    );
+
+    event FeesWithdrawn(
+        address indexed to,
+        uint256 amount
+    );
+
+    // V4 New Events
+    event AgentJoinedGuild(address indexed agent, uint256 indexed guildId);
+    event AgentLeftGuild(address indexed agent, uint256 indexed guildId);
+    event MissionCancelled(uint256 indexed missionId, uint256 refundAmount);
+    event MissionClaimed(uint256 indexed missionId, address indexed agent);
+    event FundsDeposited(address indexed user, uint256 amount);
+    event FundsWithdrawn(address indexed user, uint256 amount);
 
     modifier onlyCoordinator() {
         require(msg.sender == coordinator, "Not coordinator");
         _;
     }
 
-    constructor() {
-        coordinator = msg.sender;
+    constructor(address _coordinator) {
+        coordinator = _coordinator;
+        missionTimeout = 1800; // 30 minutes
     }
 
     // =========================
@@ -95,9 +160,12 @@ contract GuildRegistry {
             totalMissions: 0,
             totalRatingSum: 0,
             ratingCount: 0,
+            acceptedMissions: 0,
+            disputedMissions: 0,
             active: true
         });
 
+        guildsByCategory[category].push(guildId);
         guildCount++;
 
         emit GuildCreated(guildId, name, category, msg.sender);
@@ -109,20 +177,131 @@ contract GuildRegistry {
 
     function registerAgent(string calldata capability, uint256 priceWei) external {
         require(bytes(capability).length > 0, "Empty capability");
-
-        if (!agents[msg.sender].active) {
+        
+        // If updating existing agent, keep mission count
+        uint256 currentMissions = 0;
+        if (agents[msg.sender].active) {
+            currentMissions = agents[msg.sender].missionsCompleted;
+        } else {
             agentList.push(msg.sender);
         }
 
         agents[msg.sender] = Agent({
             wallet: msg.sender,
+            owner: msg.sender,
             capability: capability,
             priceWei: priceWei,
-            missionsCompleted: agents[msg.sender].missionsCompleted,
+            missionsCompleted: currentMissions,
             active: true
         });
 
         emit AgentRegistered(msg.sender, capability, priceWei);
+    }
+
+    function registerAgentWithWallet(
+        address agentWallet,
+        string calldata capability,
+        uint256 priceWei
+    ) external {
+        require(bytes(capability).length > 0, "Empty capability");
+        require(agentWallet != address(0), "Invalid wallet");
+
+        if (!agents[agentWallet].active) {
+            agentList.push(agentWallet);
+        }
+
+        agents[agentWallet] = Agent({
+            wallet: agentWallet,
+            owner: msg.sender,
+            capability: capability,
+            priceWei: priceWei,
+            missionsCompleted: agents[agentWallet].missionsCompleted,
+            active: true
+        });
+
+        emit AgentRegistered(agentWallet, capability, priceWei);
+    }
+
+    function updateAgent(
+        address agentWallet,
+        string calldata capability,
+        uint256 priceWei
+    ) external {
+        require(agents[agentWallet].active, "Agent not active");
+        require(
+            msg.sender == agents[agentWallet].owner || msg.sender == agentWallet,
+            "Not owner or agent"
+        );
+
+        agents[agentWallet].capability = capability;
+        agents[agentWallet].priceWei = priceWei;
+
+        emit AgentRegistered(agentWallet, capability, priceWei);
+    }
+
+    // =========================
+    // GUILD-AGENT LINKAGE
+    // =========================
+
+    function joinGuild(uint256 guildId) external {
+        // 1. Caller must be a registered agent
+        require(agents[msg.sender].wallet != address(0), "Not a registered agent");
+        // 2. Caller's agent must be active
+        require(agents[msg.sender].active, "Agent is not active");
+        // 3. Guild must exist and be active
+        require(guildId < guildCount, "Guild does not exist");
+        require(guilds[guildId].active, "Guild is not active");
+        // 4. Agent must not already be in this guild
+        require(!isAgentInGuild[guildId][msg.sender], "Already in guild");
+
+        // Update state
+        _guildAgents[guildId].push(msg.sender);
+        _agentGuilds[msg.sender].push(guildId);
+        isAgentInGuild[guildId][msg.sender] = true;
+        _agentInGuildCheck[msg.sender][guildId] = true;
+
+        emit AgentJoinedGuild(msg.sender, guildId);
+    }
+
+    function leaveGuild(uint256 guildId) external {
+        // 1. Agent must be in the guild
+        require(isAgentInGuild[guildId][msg.sender], "Not in guild");
+
+        // Update bool mappings
+        isAgentInGuild[guildId][msg.sender] = false;
+        _agentInGuildCheck[msg.sender][guildId] = false;
+
+        // Remove from _guildAgents[guildId] array (swap-and-pop)
+        address[] storage members = _guildAgents[guildId];
+        for (uint256 i = 0; i < members.length; i++) {
+            if (members[i] == msg.sender) {
+                members[i] = members[members.length - 1];
+                members.pop();
+                break;
+            }
+        }
+
+        // Remove from _agentGuilds[msg.sender] array (swap-and-pop)
+        uint256[] storage myGuilds = _agentGuilds[msg.sender];
+        for (uint256 i = 0; i < myGuilds.length; i++) {
+            if (myGuilds[i] == guildId) {
+                myGuilds[i] = myGuilds[myGuilds.length - 1];
+                myGuilds.pop();
+                break;
+            }
+        }
+
+        emit AgentLeftGuild(msg.sender, guildId);
+    }
+
+    function getGuildAgents(uint256 guildId) external view returns (address[] memory) {
+        require(guildId < guildCount, "Guild does not exist");
+        return _guildAgents[guildId];
+    }
+
+    function getAgentGuilds(address agent) external view returns (uint256[] memory) {
+        require(agents[agent].wallet != address(0), "Not a registered agent");
+        return _agentGuilds[agent];
     }
 
     // =========================
@@ -149,10 +328,106 @@ contract GuildRegistry {
         mission.budget = msg.value;
         mission.createdAt = block.timestamp;
         mission.completed = false;
+        mission.rated = false;
 
         guilds[guildId].totalMissions++;
 
-        emit MissionCreated(missionId, guildId, msg.sender, msg.value);
+        emit MissionCreated(missionId, msg.sender, guildId, taskHash, msg.value);
+    }
+
+    function createMissionFromBalance(uint256 guildId, bytes32 taskHash, uint256 budget) external {
+        // 1. Budget must be > 0
+        require(budget > 0, "Budget must be > 0");
+
+        // 2. User must have enough deposited balance
+        require(userBalances[msg.sender] >= budget, "Insufficient deposited balance");
+
+        // 3. Guild must exist and be active
+        require(guildId < guildCount, "Guild does not exist");
+        require(guilds[guildId].active, "Guild is not active");
+
+        // Deduct from user balance
+        userBalances[msg.sender] -= budget;
+
+        // Create mission (same logic as existing createMission but without msg.value)
+        uint256 missionId = missions.length;
+        
+        missions.push();
+        Mission storage mission = missions[missionId];
+        
+        mission.client = msg.sender;
+        mission.guildId = guildId;
+        mission.taskHash = taskHash;
+        mission.budget = budget;
+        mission.createdAt = block.timestamp;
+        mission.completedAt = 0;
+        mission.completed = false;
+        mission.rated = false;
+
+        guilds[guildId].totalMissions++;
+
+        emit MissionCreated(missionId, msg.sender, guildId, taskHash, budget);
+    }
+
+    function claimMission(uint256 missionId) external {
+        // 1. Mission must exist and not be completed
+        require(missionId < missions.length, "Mission does not exist");
+        Mission storage mission = missions[missionId];
+        require(!mission.completed, "Mission already completed");
+
+        // 2. Mission must not already be claimed
+        require(missionClaims[missionId] == address(0), "Mission already claimed");
+
+        // 3. Caller must be a registered, active agent
+        require(agents[msg.sender].wallet != address(0), "Not a registered agent");
+        require(agents[msg.sender].active, "Agent is not active");
+
+        // 4. Caller must be a member of the mission's guild
+        require(isAgentInGuild[mission.guildId][msg.sender], "Agent not in mission guild");
+
+        // 5. Mission budget must meet agent's asking price
+        require(mission.budget >= agents[msg.sender].priceWei, "Budget below agent price");
+
+        // Record the claim
+        missionClaims[missionId] = msg.sender;
+
+        emit MissionClaimed(missionId, msg.sender);
+    }
+
+    function cancelMission(uint256 missionId) external {
+        // 1. Mission must exist
+        require(missionId < missions.length, "Mission does not exist");
+        Mission storage mission = missions[missionId];
+
+        // 2. Mission must not already be completed
+        require(!mission.completed, "Mission already completed");
+
+        // 3. Caller must be the client OR the coordinator
+        require(
+            msg.sender == mission.client || msg.sender == coordinator,
+            "Only client or coordinator can cancel"
+        );
+
+        // 4. If mission is claimed and caller is the client (not coordinator),
+        //    enforce timeout: client can only cancel if missionTimeout has passed since creation
+        if (missionClaims[missionId] != address(0) && msg.sender != coordinator) {
+            require(
+                block.timestamp >= mission.createdAt + missionTimeout,
+                "Cannot cancel: mission is claimed and timeout has not elapsed"
+            );
+        }
+
+        // Mark as completed to prevent double-cancel / double-complete
+        mission.completed = true;
+        mission.completedAt = block.timestamp;
+
+        // Refund the budget to the client
+        uint256 refundAmount = mission.budget;
+
+        (bool success, ) = payable(mission.client).call{value: refundAmount}("");
+        require(success, "Refund transfer failed");
+
+        emit MissionCancelled(missionId, refundAmount);
     }
 
     function completeMission(
@@ -170,6 +445,18 @@ contract GuildRegistry {
         require(recipients.length == splits.length, "Length mismatch");
         require(recipients.length > 0, "No recipients");
 
+        // V4 Addition: Check if mission was claimed
+        if (missionClaims[missionId] != address(0)) {
+            bool claimerIncluded = false;
+            for (uint256 i = 0; i < recipients.length; i++) {
+                if (recipients[i] == missionClaims[missionId]) {
+                    claimerIncluded = true;
+                    break;
+                }
+            }
+            require(claimerIncluded, "Claimed agent must be in recipients");
+        }
+
         uint256 totalSplit = 0;
 
         for (uint256 i = 0; i < splits.length; i++) {
@@ -183,7 +470,7 @@ contract GuildRegistry {
         mission.completedAt = block.timestamp;
         mission.resultHashes = resultHashes;
 
-        totalMissionsCompleted++;
+        guilds[mission.guildId].acceptedMissions++;
 
         uint256 fee = mission.budget - totalSplit;
         if (fee > 0) {
@@ -191,9 +478,9 @@ contract GuildRegistry {
         }
 
         for (uint256 i = 0; i < recipients.length; i++) {
-
             uint256 amount = splits[i];
-
+            
+            // Update agent stats if recipient is a registered agent
             if (agents[recipients[i]].active) {
                 agents[recipients[i]].missionsCompleted++;
             }
@@ -204,7 +491,31 @@ contract GuildRegistry {
             }
         }
 
-        emit MissionCompleted(missionId, mission.guildId, totalSplit);
+        emit MissionCompleted(missionId, mission.guildId, resultHashes);
+    }
+
+    // =========================
+    // DEPOSIT / WITHDRAWAL
+    // =========================
+
+    function depositFunds() external payable {
+        require(msg.value > 0, "Must deposit something");
+
+        userBalances[msg.sender] += msg.value;
+
+        emit FundsDeposited(msg.sender, msg.value);
+    }
+
+    function withdrawFunds(uint256 amount) external {
+        require(amount > 0, "Amount must be > 0");
+        require(userBalances[msg.sender] >= amount, "Insufficient balance");
+
+        userBalances[msg.sender] -= amount;
+
+        (bool success, ) = payable(msg.sender).call{value: amount}("");
+        require(success, "Withdraw transfer failed");
+
+        emit FundsWithdrawn(msg.sender, amount);
     }
 
     // =========================
@@ -220,9 +531,10 @@ contract GuildRegistry {
 
         require(mission.completed, "Not completed");
         require(msg.sender == mission.client, "Not client");
-        require(missionRatings[missionId] == 0, "Already rated");
+        require(!mission.rated, "Already rated");
 
-        missionRatings[missionId] = score;
+        mission.rated = true;
+        mission.rating = score;
 
         Guild storage guild = guilds[mission.guildId];
 
@@ -265,57 +577,19 @@ contract GuildRegistry {
     function getMission(uint256 missionId)
         external
         view
-        returns (
-            address client,
-            uint256 guildId,
-            bytes32 taskHash,
-            uint256 budget,
-            uint256 createdAt,
-            uint256 completedAt,
-            bool completed,
-            bytes32[] memory resultHashes
-        )
+        returns (Mission memory)
     {
         require(missionId < missions.length, "Invalid mission ID");
-
-        Mission storage mission = missions[missionId];
-
-        return (
-            mission.client,
-            mission.guildId,
-            mission.taskHash,
-            mission.budget,
-            mission.createdAt,
-            mission.completedAt,
-            mission.completed,
-            mission.resultHashes
-        );
+        return missions[missionId];
     }
 
     function getGuild(uint256 guildId)
         external
         view
-        returns (
-            string memory name,
-            string memory category,
-            address creator,
-            uint256 totalMissions,
-            uint256 ratingCount,
-            bool active
-        )
+        returns (Guild memory)
     {
         require(guildId < guildCount, "Invalid guild");
-
-        Guild storage guild = guilds[guildId];
-
-        return (
-            guild.name,
-            guild.category,
-            guild.creator,
-            guild.totalMissions,
-            guild.ratingCount,
-            guild.active
-        );
+        return guilds[guildId];
     }
 
     function getGuildReputation(uint256 guildId)
