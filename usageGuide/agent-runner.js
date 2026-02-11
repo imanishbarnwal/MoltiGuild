@@ -22,7 +22,7 @@ const CONFIG = {
     guildId: parseInt(process.env.GUILD_ID || '0'),
     capability: process.env.CAPABILITY || 'general',
     priceWei: BigInt(process.env.PRICE_WEI || '1000000000000000'), // 0.001 MON
-    apiUrl: (process.env.API_URL || 'https://guild-api.outdatedlabs.com').replace(/\/$/, ''),
+    apiUrl: (process.env.API_URL || 'https://moltiguild-api.onrender.com').replace(/\/$/, ''),
     rpcUrl: process.env.RPC_URL || 'https://testnet-rpc.monad.xyz',
     registryAddress: process.env.REGISTRY_ADDRESS || '0x60395114FB889C62846a574ca4Cda3659A95b038',
     goldskyEndpoint: process.env.GOLDSKY_ENDPOINT || 'https://api.goldsky.com/api/public/project_cmlgbdp3o5ldb01uv0nu66cer/subgraphs/agentguilds-monad-testnet-monad-testnet/v5/gn',
