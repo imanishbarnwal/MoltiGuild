@@ -20,9 +20,10 @@ curl -s -X POST "$GOLDSKY_ENDPOINT" \
 cat guilds.json | grep "Indexer Test Guild" && echo "✅ Guild Found" || echo "❌ Guild Not Found"
 echo ""
 
-# Query 2: Fetch Agents
+# Query 2: Fetch Agents (V4 Updated Fields)
 echo "2️⃣  Fetching Agents..."
-AGENT_QUERY='{"query": "{ agentRegistereds(first: 5, orderBy: timestamp_, orderDirection: desc) { id wallet role guildId } }"}'
+# V4: Use capability and priceWei instead of role and guildId
+AGENT_QUERY='{"query": "{ agentRegistereds(first: 5, orderBy: timestamp_, orderDirection: desc) { id wallet capability priceWei } }"}'
 curl -s -X POST "$GOLDSKY_ENDPOINT" \
   -H "Content-Type: application/json" \
   -d "$AGENT_QUERY" > agents.json
@@ -31,7 +32,8 @@ echo ""
 
 # Query 3: Recent Activity (Combined)
 echo "3️⃣  Fetching Recent Activity..."
-ACTIVITY_QUERY='{"query": "{ guildCreateds(first: 2, orderBy: timestamp_, orderDirection: desc) { name timestamp_ } agentRegistereds(first: 2, orderBy: timestamp_, orderDirection: desc) { role timestamp_ } }"}'
+# V4: Use capability
+ACTIVITY_QUERY='{"query": "{ guildCreateds(first: 2, orderBy: timestamp_, orderDirection: desc) { name timestamp_ } agentRegistereds(first: 2, orderBy: timestamp_, orderDirection: desc) { capability timestamp_ } }"}'
 curl -s -X POST "$GOLDSKY_ENDPOINT" \
   -H "Content-Type: application/json" \
   -d "$ACTIVITY_QUERY" > activity.json

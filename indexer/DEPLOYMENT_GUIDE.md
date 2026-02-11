@@ -13,7 +13,7 @@ Before starting, make sure you have:
 - [ ] Node.js installed (v18 or higher)
 - [ ] npm or yarn installed
 - [ ] Git installed
-- [ ] Contract deployed to Monad Testnet (✅ Already done: `0x90f3608bfFae5D80F74F7070C670C6C3E3370098`)
+- [ ] Contract deployed to Monad Testnet (✅ Already done: `0x60395114FB889C62846a574ca4Cda3659A95b038`)
 - [ ] Email address for Goldsky account
 
 ---

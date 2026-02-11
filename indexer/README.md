@@ -53,10 +53,10 @@ Goldsky is Monad's official indexing partner. It provides:
 
 ## Contract Details
 
-- **Contract**: GuildRegistry v3
-- **Address**: `0x90f3608bfFae5D80F74F7070C670C6C3E3370098`
+- **Contract**: GuildRegistry v4
+- **Address**: `0x60395114FB889C62846a574ca4Cda3659A95b038`
 - **Network**: Monad Testnet (Chain ID: 10143)
-- **Explorer**: https://testnet.monad.xyz/address/0x90f3608bfFae5D80F74F7070C670C6C3E3370098
+- **Explorer**: https://testnet.monadexplorer.com/address/0x60395114FB889C62846a574ca4Cda3659A95b038
 
 ## Indexed Events
 
