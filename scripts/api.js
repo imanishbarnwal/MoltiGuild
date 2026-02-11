@@ -65,39 +65,71 @@ function broadcast(event, data) {
 }
 
 // ═══════════════════════════════════════
-// PERSISTENT STATE (JSON files)
+// PERSISTENT STATE (Upstash Redis → JSON file fallback)
 // ═══════════════════════════════════════
 
+let redis = null;
+if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+    const { Redis } = require('@upstash/redis');
+    redis = new Redis({
+        url: process.env.UPSTASH_REDIS_REST_URL,
+        token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    });
+    console.log('Using Upstash Redis for state');
+} else {
+    console.log('No UPSTASH_REDIS_REST_URL — falling back to JSON files');
+}
+
+// JSON file fallback (local dev or no Redis)
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../data');
 
 function ensureDataDir() {
-    if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-function loadJSON(filename, defaultValue = {}) {
-    const filepath = path.join(DATA_DIR, filename);
-    try {
-        return JSON.parse(fs.readFileSync(filepath, 'utf8'));
-    } catch {
-        return defaultValue;
-    }
+function loadJSONFile(filename, defaultValue = {}) {
+    try { return JSON.parse(fs.readFileSync(path.join(DATA_DIR, filename), 'utf8')); }
+    catch { return defaultValue; }
 }
 
-function saveJSON(filename, data) {
+function saveJSONFile(filename, data) {
     ensureDataDir();
-    const filepath = path.join(DATA_DIR, filename);
-    fs.writeFileSync(filepath, JSON.stringify(data, null, 2));
+    fs.writeFileSync(path.join(DATA_DIR, filename), JSON.stringify(data, null, 2));
 }
 
-function getHeartbeats() { return loadJSON('heartbeats.json'); }
-function saveHeartbeats(data) { saveJSON('heartbeats.json', data); }
-function getPipelines() { return loadJSON('pipelines.json'); }
-function savePipelines(data) { saveJSON('pipelines.json', data); }
+// Unified async getters/setters — Redis if available, JSON files otherwise
+async function getHeartbeats() {
+    if (redis) return (await redis.get('heartbeats')) || {};
+    return loadJSONFile('heartbeats.json');
+}
+
+async function saveHeartbeats(data) {
+    if (redis) { await redis.set('heartbeats', data); return; }
+    saveJSONFile('heartbeats.json', data);
+}
+
+async function getPipelines() {
+    if (redis) return (await redis.get('pipelines')) || {};
+    return loadJSONFile('pipelines.json');
+}
+
+async function savePipelines(data) {
+    if (redis) { await redis.set('pipelines', data); return; }
+    saveJSONFile('pipelines.json', data);
+}
+
+async function getPipelineCounter() {
+    if (redis) return (await redis.get('pipeline:counter')) || 0;
+    return Object.keys(loadJSONFile('pipelines.json')).length;
+}
+
+async function incPipelineCounter() {
+    if (redis) return await redis.incr('pipeline:counter');
+    const count = Object.keys(loadJSONFile('pipelines.json')).length + 1;
+    return count;
+}
 
 let pipelineCounter = 0;
-try { pipelineCounter = Object.keys(getPipelines()).length; } catch {}
 
 
 // ═══════════════════════════════════════
@@ -146,12 +178,12 @@ function requireAuth(action) {
 // POST /api/heartbeat
 app.post('/api/heartbeat', requireAuth('heartbeat'), async (req, res) => {
     try {
-        const heartbeats = getHeartbeats();
+        const heartbeats = await getHeartbeats();
         heartbeats[req.agentAddress] = {
             lastSeen: Date.now(),
             timestamp: new Date().toISOString(),
         };
-        saveHeartbeats(heartbeats);
+        await saveHeartbeats(heartbeats);
         broadcast('heartbeat', { agent: req.agentAddress, timestamp: new Date().toISOString() });
         res.json({ ok: true, message: 'Heartbeat recorded' });
     } catch (err) {
@@ -219,7 +251,8 @@ app.post('/api/create-pipeline', async (req, res) => {
         if (!task) return res.status(400).json({ ok: false, error: 'Missing task description' });
         if (!budget) return res.status(400).json({ ok: false, error: 'Missing budget (in MON, e.g. "0.01")' });
 
-        const pipelineId = `pipeline-${++pipelineCounter}`;
+        const counter = await incPipelineCounter();
+        const pipelineId = `pipeline-${counter}`;
         const budgetWei = monad.parseEther(budget);
         const taskHash = monad.hashTask(task);
         const gid = parseInt(guildId);
@@ -230,7 +263,7 @@ app.post('/api/create-pipeline', async (req, res) => {
         const missionId = missionCount - 1;
 
         // Store pipeline state off-chain
-        const pipelines = getPipelines();
+        const pipelines = await getPipelines();
         pipelines[pipelineId] = {
             id: pipelineId,
             missionId,
@@ -250,7 +283,7 @@ app.post('/api/create-pipeline', async (req, res) => {
             contributors: [], // { agent, role, result, resultHash }
             createdAt: new Date().toISOString(),
         };
-        savePipelines(pipelines);
+        await savePipelines(pipelines);
 
         broadcast('pipeline_created', { pipelineId, missionId, guildId: gid, task, totalSteps: steps.length, budget });
         res.json({
@@ -286,7 +319,7 @@ app.post('/api/submit-result', requireAuth('submit-result'), async (req, res) =>
         const resultHash = monad.hashResult(resultData);
 
         // Check if this mission is part of a pipeline
-        const pipelines = getPipelines();
+        const pipelines = await getPipelines();
         let pipeline = null;
         let pipelineId = null;
         for (const [pid, p] of Object.entries(pipelines)) {
@@ -321,7 +354,7 @@ app.post('/api/submit-result', requireAuth('submit-result'), async (req, res) =>
                 nextStep.status = 'awaiting_claim';
                 nextStep.previousResult = resultData;
                 pipeline.currentStep += 1;
-                savePipelines(pipelines);
+                await savePipelines(pipelines);
 
                 broadcast('step_completed', {
                     pipelineId, missionId: mid, agent: req.agentAddress,
@@ -359,7 +392,7 @@ app.post('/api/submit-result', requireAuth('submit-result'), async (req, res) =>
 
             pipeline.status = 'completed';
             pipeline.completedAt = new Date().toISOString();
-            savePipelines(pipelines);
+            await savePipelines(pipelines);
 
             broadcast('pipeline_completed', {
                 pipelineId, missionId: mid,
@@ -511,7 +544,7 @@ app.post('/api/admin/create-guild', requireAdmin, async (req, res) => {
 // GET /api/pipeline/:id - Pipeline status
 app.get('/api/pipeline/:id', async (req, res) => {
     try {
-        const pipelines = getPipelines();
+        const pipelines = await getPipelines();
         const pipeline = pipelines[req.params.id];
         if (!pipeline) return res.status(404).json({ ok: false, error: 'Pipeline not found' });
         res.json({ ok: true, data: pipeline });
@@ -523,7 +556,7 @@ app.get('/api/pipeline/:id', async (req, res) => {
 // GET /api/pipelines - All pipelines
 app.get('/api/pipelines', async (req, res) => {
     try {
-        const pipelines = getPipelines();
+        const pipelines = await getPipelines();
         const list = Object.values(pipelines).map(p => ({
             id: p.id,
             task: p.task,
@@ -545,7 +578,7 @@ app.get('/api/pipelines', async (req, res) => {
 app.get('/api/missions/next', async (req, res) => {
     try {
         const { guildId } = req.query;
-        const pipelines = getPipelines();
+        const pipelines = await getPipelines();
 
         const awaiting = [];
         for (const pipeline of Object.values(pipelines)) {
@@ -579,7 +612,7 @@ app.get('/api/missions/next', async (req, res) => {
 app.get('/api/mission-context/:missionId', async (req, res) => {
     try {
         const missionId = parseInt(req.params.missionId);
-        const pipelines = getPipelines();
+        const pipelines = await getPipelines();
 
         for (const pipeline of Object.values(pipelines)) {
             if (pipeline.missionId !== missionId) continue;
@@ -611,7 +644,7 @@ app.get('/api/mission-context/:missionId', async (req, res) => {
 app.get('/api/status', async (req, res) => {
     try {
         const stats = await monad.getStatus();
-        const heartbeats = getHeartbeats();
+        const heartbeats = await getHeartbeats();
         const onlineCount = Object.values(heartbeats)
             .filter(h => Date.now() - h.lastSeen < 15 * 60 * 1000).length;
 
@@ -668,7 +701,7 @@ app.get('/api/missions/open', async (req, res) => {
 // GET /api/agents/online
 app.get('/api/agents/online', async (req, res) => {
     try {
-        const heartbeats = getHeartbeats();
+        const heartbeats = await getHeartbeats();
         const now = Date.now();
         const online = Object.entries(heartbeats)
             .filter(([, h]) => now - h.lastSeen < 15 * 60 * 1000)
