@@ -20,7 +20,7 @@
     "agents": {
         "defaults": {
             "model": {
-                "primary": "ollama/gpt-oss:120b"
+                "primary": "ollama/kimi-k2.5"
             }
         },
         "list": [
