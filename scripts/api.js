@@ -170,6 +170,96 @@ async function addUsedTxHash(hash) {
 }
 
 // ═══════════════════════════════════════
+// AUTO-SETUP (wallet generation + faucet + deposit)
+// ═══════════════════════════════════════
+
+const { generatePrivateKey, privateKeyToAccount } = require('viem/accounts');
+
+async function getUserWallet(userId) {
+    if (redis) return await redis.get(`wallet:${userId}`);
+    const wallets = loadJSONFile('wallets.json');
+    return wallets[userId] || null;
+}
+
+async function saveUserWallet(userId, data) {
+    if (redis) return await redis.set(`wallet:${userId}`, data);
+    const wallets = loadJSONFile('wallets.json');
+    wallets[userId] = data;
+    saveJSONFile('wallets.json', wallets);
+}
+
+const FAUCET_URL = 'https://agents.devnads.com/v1/faucet';
+const SETUP_AMOUNT = '0.05'; // Give users 0.05 MON = 50 missions
+
+async function autoSetupUser(userId) {
+    // Check if already set up
+    let wallet = await getUserWallet(userId);
+    if (wallet) {
+        const credits = await getCredits(userId);
+        return { alreadySetup: true, address: wallet.address, credits };
+    }
+
+    // Generate wallet
+    const privateKey = generatePrivateKey();
+    const account = privateKeyToAccount(privateKey);
+    wallet = { address: account.address, key: privateKey };
+    await saveUserWallet(userId, wallet);
+
+    // Faucet
+    let faucetOk = false;
+    try {
+        const fRes = await fetch(FAUCET_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ address: account.address, chainId: 10143 }),
+        });
+        const fData = await fRes.json();
+        faucetOk = !!fData.txHash;
+    } catch (e) { /* faucet may fail, continue */ }
+
+    if (faucetOk) {
+        // Wait for faucet to land
+        await new Promise(r => setTimeout(r, 5000));
+
+        // Send MON from user wallet to coordinator
+        try {
+            const { createWalletClient: cwc, http: httpT, parseEther: pe } = require('viem');
+            const userWallet = cwc({
+                account,
+                chain: monad.monadTestnet,
+                transport: httpT(process.env.MONAD_RPC || 'https://testnet-rpc.monad.xyz'),
+            });
+
+            const hash = await userWallet.sendTransaction({
+                to: COORDINATOR_ADDRESS,
+                value: pe(SETUP_AMOUNT),
+                type: 'legacy',
+            });
+
+            const publicClient = monad.getPublicClient();
+            await publicClient.waitForTransactionReceipt({ hash, timeout: 30000 });
+
+            // Credit the user
+            const currentCredits = await getCredits(userId);
+            await setCredits(userId, currentCredits + parseFloat(SETUP_AMOUNT));
+            await addUsedTxHash(hash.toLowerCase());
+
+            return {
+                alreadySetup: false,
+                address: account.address,
+                credits: currentCredits + parseFloat(SETUP_AMOUNT),
+                funded: true,
+                depositTx: hash,
+            };
+        } catch (e) {
+            return { alreadySetup: false, address: account.address, credits: 0, funded: false, error: e.message };
+        }
+    }
+
+    return { alreadySetup: false, address: account.address, credits: 0, funded: false, error: 'Faucet unavailable' };
+}
+
+// ═══════════════════════════════════════
 // SIGNATURE VERIFICATION
 // ═══════════════════════════════════════
 
@@ -639,6 +729,41 @@ app.post('/api/verify-payment', async (req, res) => {
     }
 });
 
+// POST /api/auto-setup - Generate wallet, faucet, deposit, credit user automatically
+app.post('/api/auto-setup', async (req, res) => {
+    try {
+        const { userId } = req.body;
+        if (!userId) return res.status(400).json({ ok: false, error: 'Missing userId' });
+
+        const result = await autoSetupUser(userId);
+
+        if (result.alreadySetup) {
+            return res.json({
+                ok: true,
+                data: {
+                    status: 'already_setup',
+                    address: result.address,
+                    credits: `${result.credits} MON`,
+                },
+            });
+        }
+
+        res.json({
+            ok: true,
+            data: {
+                status: result.funded ? 'setup_complete' : 'setup_partial',
+                address: result.address,
+                credits: `${result.credits} MON`,
+                funded: result.funded,
+                depositTx: result.depositTx,
+                error: result.error,
+            },
+        });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
 // POST /api/admin/add-credits - Admin manually adds credits (for testing/promos)
 app.post('/api/admin/add-credits', requireAdmin, async (req, res) => {
     try {
@@ -672,13 +797,20 @@ app.post('/api/smart-create', async (req, res) => {
 
         if (!isAdmin) {
             if (!userId) return res.status(401).json({ ok: false, error: 'Missing X-Admin-Key or userId' });
-            const credits = await getCredits(userId);
+            let credits = await getCredits(userId);
+
+            // Auto-setup if no credits
             if (credits < parseFloat(missionBudget)) {
-                return res.status(402).json({
-                    ok: false,
-                    error: `Insufficient credits. Need ${missionBudget} MON, have ${credits} MON. Send MON to ${COORDINATOR_ADDRESS} and verify with /api/verify-payment`,
-                });
+                const setup = await autoSetupUser(userId);
+                credits = setup.credits || 0;
+                if (credits < parseFloat(missionBudget)) {
+                    return res.status(402).json({
+                        ok: false,
+                        error: `Insufficient credits. Auto-setup ${setup.funded ? 'succeeded but balance too low' : 'failed: ' + (setup.error || 'unknown')}. Send MON to ${COORDINATOR_ADDRESS} and verify with /api/verify-payment`,
+                    });
+                }
             }
+
             // Deduct credits
             await setCredits(userId, credits - parseFloat(missionBudget));
         }
