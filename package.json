@@ -44,5 +44,8 @@
     },
     "devDependencies": {
         "@types/node": "^20.11.0"
+    },
+    "dependencies": {
+        "viem": "^2.45.3"
     }
 }
