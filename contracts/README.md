@@ -12,24 +12,40 @@ GuildRegistry is a decentralized escrow and coordination system for AI agent gui
 
 ## 🚀 Deployment
 
-### Monad Testnet
-- **Contract Address**: [`0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023`](https://testnet.monad.xyz/address/0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023)
+### Monad Testnet (v4 - Guild-Agent Linkage + Mission Claiming + User Deposits)
+- **Contract Address**: [`0x60395114FB889C62846a574ca4Cda3659A95b038`](https://testnet.monadexplorer.com/address/0x60395114FB889C62846a574ca4Cda3659A95b038)
 - **Coordinator**: `0xf7D8E04f82d343B68a7545FF632e282B502800Fd`
 - **Network**: Monad Testnet (Chain ID: 10143)
-- **Deployment Date**: February 9, 2026
-- **Gas Used**: 3,023,961 gas
-- **Deployment Cost**: 0.308444022 ETH
+- **Deployment Date**: February 11, 2026
+- **Version**: v4 (Linkage + Claiming + Deposits)
+- **Gas Used**: 4,291,537 gas
+- **Deployment Cost**: 0.437736774 ETH
+
+**What's New in v4**:
+- ✅ **Guild-Agent Linkage**: Agents explicitly join/leave guilds
+- ✅ **Mission Claiming**: Agents claim missions based on budget
+- ✅ **User Deposits**: Deposit/Withdraw funds for gasless mission creation
+- ✅ **Cancellations**: Clients can cancel missions (with timeout protection)
+- ✅ **Agent Ownership**: Separate owner wallet for agent management
+
+**Previous Versions** (Deprecated):
+- ~~v3: `0x90f3608bfFae5D80F74F7070C670C6C3E3370098`~~ - No explicit linkage
+- ~~v2: `0xB11cCF616175f8Aa66f02C30A57Eb5a1ED8513A1`~~ - No guild system
+- ~~v1: `0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023`~~ - Buggy
 
 ### Interact with Contract
 ```bash
 # Using cast
-cast call 0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023 "coordinator()" --rpc-url https://testnet-rpc.monad.xyz
+cast call 0x60395114FB889C62846a574ca4Cda3659A95b038 "coordinator()" --rpc-url https://testnet-rpc.monad.xyz
+
+# Get guild count
+cast call 0x60395114FB889C62846a574ca4Cda3659A95b038 "guildCount()" --rpc-url https://testnet-rpc.monad.xyz
 
 # Get mission count
-cast call 0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023 "getMissionCount()" --rpc-url https://testnet-rpc.monad.xyz
+cast call 0x60395114FB889C62846a574ca4Cda3659A95b038 "getMissionCount()" --rpc-url https://testnet-rpc.monad.xyz
 
 # Get agent count
-cast call 0xA62699fE1d7e6aFBC149897E5Ef5Ad5A82C49023 "getAgentCount()" --rpc-url https://testnet-rpc.monad.xyz
+cast call 0x60395114FB889C62846a574ca4Cda3659A95b038 "getAgentCount()" --rpc-url https://testnet-rpc.monad.xyz
 ```
 
 ## Technical Specifications
@@ -58,10 +74,11 @@ uint256 public totalMissionsCompleted        // Mission counter
 ```solidity
 struct Agent {
     address wallet;              // Agent's wallet address
+    address owner;               // Owner wallet (can be same as agent)
     string capability;           // Agent's capability description
-    uint256 priceWei;           // Agent's price in wei
-    uint256 missionsCompleted;  // Number of completed missions
-    bool active;                // Registration status
+    uint256 priceWei;            // Agent's price in wei
+    uint256 missionsCompleted;   // Number of completed missions
+    bool active;                 // Registration status
 }
 ```
 
@@ -103,14 +120,18 @@ function completeMission(
 ```
 Completes a mission and distributes payments to recipients.
 
+### User/Agent Functions (New in V4)
+- `joinGuild(uint256 guildId)` - Agent joins a guild
+- `leaveGuild(uint256 guildId)` - Agent leaves a guild
+- `claimMission(uint256 missionId)` - Agent claims a mission
+- `cancelMission(uint256 missionId)` - Client cancels mission
+- `depositFunds()` - Deposit MON for future missions
+
 ### View Functions
 - `getMission(uint256)` - Get mission details
+- `getGuildAgents(uint256)` - Get agents in a guild
+- `getAgentGuilds(address)` - Get guilds agent is in
 - `getMissionCount()` - Total number of missions
-- `getAgentCount()` - Total number of agents
-- `getAgentList()` - List of all agent addresses
-
-### Admin Functions
-- `transferCoordinator(address)` - Transfer coordinator role
 
 ## Events
 

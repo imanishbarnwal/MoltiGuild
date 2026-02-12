@@ -1,36 +1,32 @@
 FROM node:22-slim
 
-# Install dependencies for Ollama and other tools
+# Minimal deps: git for pnpm, curl for health checks
 RUN apt-get update && apt-get install -y \
     curl \
-    bash \
-    zstd \
-    ca-certificates \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Ollama
-RUN curl -fsSL https://ollama.com/install.sh | sh
+# Install pnpm (OpenClaw uses pnpm workspaces)
+RUN npm install -g pnpm@10.23.0
 
-# Note: OpenClaw needs to be built from source
-# We'll handle this in the entrypoint script
+# Install Cloudflare Tunnel (single binary, ~50MB)
+RUN curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 \
+    -o /usr/local/bin/cloudflared && chmod +x /usr/local/bin/cloudflared
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
-RUN npm install
+# Copy MoltiGuild configs (agents, skills, openclaw config)
+COPY agents/ ./agents/
+COPY skills/ ./skills/
+COPY openclaw.config.json ./
 
-# Copy application files
-COPY . .
+# Copy entrypoint
+COPY infra/entrypoint.sh ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh
 
-# Expose ports
-# 18789 - OpenClaw Gateway
-# 11434 - Ollama API
-EXPOSE 18789 11434
+# openclaw-repo is mounted as a volume at runtime
+# node_modules is cached in a separate volume
 
-# Copy and set entrypoint
-COPY infra/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+EXPOSE 18789
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["./entrypoint.sh"]

@@ -31,9 +31,10 @@ contracts/lib/
 # Docker
 *.log
 
-# IDE
+# IDE / Tools
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 *~
@@ -49,8 +50,13 @@ coverage/
 # Temporary files
 *.tmp
 *.temp
+*.bak
 tmp/
 temp/
+nul
+
+# Data files
+data/
 
 # Vercel
 .vercel

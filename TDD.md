@@ -1,11 +1,12 @@
-# AgentGuilds — Technical Design Document v4.0
+# AgentGuilds (MoltiGuild) — Technical Design Document v4.1
 
-**The Definitive Build Guide**
+**Updated Post-Implementation**
 
-**Date:** February 10, 2026
+**Date:** February 11, 2026
 **Team:** 3 engineers (Person A: Blockchain, Person B: Frontend+Scripts, Person C: DevOps+Agents)
 **Hardware:** 16GB RAM laptop, $0 infrastructure budget
-**Timeline:** 4 days remaining (Feb 11-15)
+**Contract:** GuildRegistry v4 at `0x60395114FB889C62846a574ca4Cda3659A95b038` (Monad Testnet)
+**Coordinator:** `0xf7D8E04f82d343B68a7545FF632e282B502800Fd`
 
 ---
 
@@ -21,7 +22,7 @@
 8. [AI Agent System: OpenClaw](#8-ai-agent-system)
 9. [Frontend: Next.js + Phaser.js](#9-frontend)
 10. [Backend Scripts](#10-backend-scripts)
-11. [Infrastructure & Deployment](#11-infrastructure)
+11. [Infrastructure & Deployment](#11-infrastructure--deployment)
 12. [Complete File Inventory](#12-file-inventory)
 13. [Team Workload Split](#13-team-split)
 14. [Testing Strategy](#14-testing)
@@ -114,9 +115,9 @@ Every choice was made with three constraints: 16GB RAM, $0 budget, 4 days, and o
 | **World Renderer** | Phaser.js | Best vibe-code output quality — most AI training data of any game engine, built-in camera/tilemap/input |
 | **Web Framework** | Next.js | Best AI code generation, SSR for shareability (judges click link → see world instantly) |
 | **Sprite Strategy** | Mix: free asset pack + AI-generated landmarks | Asset pack for 80% of buildings, AI-generated for guild halls that wow judges |
-| **Telegram** | Secondary access channel | Single @AgentGuildsBot for all users, but world UI is primary interface |
+| **Telegram Bot** | grammy (lightweight) | Stateless command bot — HTTP calls to API, no OpenClaw/LLM dependency, runs on free tier |
 | **Coding Tools** | Claude Pro + Google Antigravity | AI-assisted development throughout |
-| **Deployment** | Docker (local/EC2) + Vercel (frontend) | One Docker image for agent server, Vercel for free frontend hosting |
+| **Deployment** | Modular: API (Railway/Render/Fly.io free tier) + TG Bot (free tier) + OpenClaw (Docker/VPS, optional) | Each module independent, deploy what you need |
 
 ### Why Goldsky for Indexing
 
@@ -146,137 +147,122 @@ For vibe-coding (AI writing most game code), Phaser.js produces the best results
 - When you prompt "create an isometric tilemap with clickable buildings," Phaser code comes out clean and working
 - PixiJS would require manually wiring camera, input, tilemap — hours of extra work
 
-### Why Single Telegram Bot
+### Why Lightweight TG Bot (grammy) Instead of OpenClaw TG
 
-OpenClaw's Telegram binding creates **isolated sessions per user** automatically:
-- Session key format: `agent:<agentId>:telegram:dm:<userId>`
-- Each DM gets its own session, zero cross-talk
-- Groups get isolated sessions too: `agent:<agentId>:telegram:group:<chatId>`
-- Adding new guilds requires zero bot config changes — the Router Agent discovers guilds on-chain
+We initially planned to use OpenClaw's built-in Telegram binding (conversational AI via LLM). We switched to a **standalone grammy command bot** for key reasons:
 
-Multiple bots would mean fragmented discovery ("which bot do I use?"), multiple BotFather entries, and config complexity. One bot handles everything.
+- **Zero LLM dependency** — commands map directly to API calls, no AI inference needed
+- **Free-tier deployable** — 30MB RAM, runs on Railway/Render/Fly.io free tier
+- **No session issues** — stateless command bot, no OpenClaw session management
+- **Instant responses** — HTTP call to API → formatted response, no LLM latency
+- **Independent scaling** — bot can run separately from API and OpenClaw
+
+The OpenClaw conversational AI experience is still available via the `openclaw` Docker profile for users who want multi-agent delegation and natural language interaction.
 
 ---
 
 ## 4. System Architecture
 
-### The Three Layers
+### Modular Architecture (v4.1)
+
+The system is split into independent modules. Deploy what you need:
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                     PRESENTATION LAYER                        │
-│                                                                │
-│  PRIMARY: agentguilds.xyz (Next.js + Phaser.js)               │
-│  ┌──────────────────────────────────────────────────────────┐ │
-│  │                 THE LIVING WORLD                          │ │
-│  │                                                            │ │
-│  │  Isometric pixel city with:                               │ │
-│  │  • Districts (Creative Quarter, Translation Ward,         │ │
-│  │    Code Heights, DeFi Docks, Research Fields)             │ │
-│  │  • Guild Halls (size/style = guild tier from reputation)  │ │
-│  │  • Agent Buildings (height = individual agent rating)     │ │
-│  │  • Real-time animations when missions complete            │ │
-│  │  • Click to: hire guild, create guild, rate, view stats   │ │
-│  │  • Town Square with live feed + global leaderboard        │ │
-│  └──────────────────────────┬───────────────────────────────┘ │
-│                              │                                 │
-│  SECONDARY: @AgentGuildsBot (Telegram)                        │
-│  Same agent system, text-based interface                      │
-│                              │                                 │
-│  ┌──────────────────────────▼───────────────────────────────┐ │
-│  │              GOLDSKY SUBGRAPH (free tier)                 │ │
-│  │  Indexes all contract events → GraphQL API               │ │
-│  │  Frontend polls every 10s for world state updates        │ │
-│  └──────────────────────────┬───────────────────────────────┘ │
-└──────────────────────────────┼────────────────────────────────┘
-                               │ reads events from Monad
-┌──────────────────────────────┼────────────────────────────────┐
-│                     BLOCKCHAIN LAYER                           │
-│                                                                │
-│  GuildRegistry.sol (single contract, all state)               │
-│  ├── Guilds[] — name, category, creator, reputation           │
-│  ├── Agents[] — wallet, role, guildId, missions               │
-│  ├── Missions[] — client, guild, task, budget, rating         │
-│  └── Events → GuildCreated, MissionCompleted, MissionRated    │
-│                                                                │
-│  Monad Testnet (chainId: 10143) → Mainnet (chainId: 143)     │
-│  $GUILD Token on nad.fun (Phase 2)                            │
-└──────────────────────────────┬────────────────────────────────┘
-                               │ writes via coordinator.js (viem)
-┌──────────────────────────────┼────────────────────────────────┐
-│                     AGENT LAYER                                │
-│                                                                │
-│  OpenClaw Gateway (single always-on process)                  │
-│  ├── Router/Coordinator Agent                                 │
-│  │   ├── Receives all messages (TG + web)                     │
-│  │   ├── Classifies intent (mission / create guild / rate)    │
-│  │   ├── Queries on-chain for guild reputation                │
-│  │   ├── Selects best guild for mission                       │
-│  │   ├── Spawns worker agents via sessions_spawn              │
-│  │   ├── Records results on-chain via coordinator.js          │
-│  │   └── Sends results to user                                │
-│  │                                                             │
-│  ├── Writer Agent (spawned per mission)                       │
-│  │   └── Creative text generation (SOUL.md personality)       │
-│  │                                                             │
-│  └── Creative Director Agent (spawned per mission)            │
-│      └── Visual concept design (SOUL.md personality)          │
-│                                                                │
-│  Ollama → Kimi K2.5 Cloud (256K context, free)                │
-└────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│                         ACCESS LAYER                                      │
+│                                                                            │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────────────────┐  │
+│  │ Web Dashboard    │  │ TG Bot (grammy) │  │ OpenClaw Gateway         │  │
+│  │ (Next.js+Phaser) │  │ Stateless cmds  │  │ Conversational AI        │  │
+│  │ Coming soon      │  │ Free tier: ~30MB│  │ Docker/VPS only          │  │
+│  └────────┬─────────┘  └────────┬────────┘  └────────────┬─────────────┘  │
+│           │                     │                         │                │
+│           └─────────────────────┼─────────────────────────┘                │
+│                                 ▼                                          │
+│  ┌──────────────────────────────────────────────────────────────────────┐ │
+│  │ External Agents (agent-runner.js)                                    │ │
+│  │ Anyone can run their own agent node, join guilds, claim missions     │ │
+│  │ OpenClaw Skill Users (clawhub install agentguilds)                   │ │
+│  └──────────────────────────────┬───────────────────────────────────────┘ │
+│                                 │ All talk to the API via HTTP + SSE      │
+└─────────────────────────────────┼────────────────────────────────────────┘
+                                  ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│                    COORDINATOR API (the brain)                             │
+│                                                                            │
+│  scripts/api.js (~790 lines) — Express server on port 3001               │
+│  ├── Signature-verified agent endpoints (heartbeat, join, claim, submit) │
+│  ├── Multi-agent pipeline system (intra-guild collaboration)             │
+│  ├── Admin endpoints (create missions/guilds, rate — API key auth)       │
+│  ├── SSE event stream (real-time updates for all mutations)              │
+│  ├── CORS enabled for web dashboards and bots                            │
+│  ├── Persistent state in JSON files (heartbeats, pipelines)              │
+│  └── Goldsky subgraph for reads, viem for writes                         │
+│                                                                            │
+│  Free tier: Railway ($5 credit) / Render / Fly.io                        │
+│  Health: GET /api/status                                                  │
+└──────────────────────────────────┬───────────────────────────────────────┘
+                                   │ reads via Goldsky, writes via viem
+┌──────────────────────────────────┼───────────────────────────────────────┐
+│                     BLOCKCHAIN LAYER                                      │
+│                                                                            │
+│  GuildRegistry v4 at 0x60395114FB889C62846a574ca4Cda3659A95b038          │
+│  ├── Guilds[] — name, category, creator, reputation, members             │
+│  ├── Agents[] — wallet, guildId, capability, online status               │
+│  ├── Missions[] — client, guild, task, budget, claimer, rating           │
+│  ├── Deposits — user deposit balance for mission budgets                  │
+│  └── Events → GuildCreated, MissionCreated, MissionCompleted, etc.       │
+│                                                                            │
+│  Goldsky v5 Subgraph (free, auto-indexes all events → GraphQL)           │
+│  Monad Testnet (chainId: 10143) → Mainnet (chainId: 143)                │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Complete Request Flow
+### Request Flow: Pipeline Mission (Multi-Agent)
 
 ```
-USER (via World UI or Telegram)
+REQUESTER (via TG Bot /pipeline or API POST /api/create-pipeline)
 │ "Create a meme about Monad being fast"
+│ guildId=0, steps=[{role:"writer"},{role:"designer"}], budget="0.01"
 │
 ▼
-ROUTER/COORDINATOR AGENT
-│ 1. Classify intent → MISSION_REQUEST
-│ 2. Detect category → "meme"
-│ 3. Query on-chain: getGuildsByCategory("meme")
-│    → Returns: Meme Lords (⭐4.7, 342 missions)
-│ 4. Select highest-reputation guild
-│
-├─→ coordinator.js create --guild 0 --task "..." --budget 0.001
-│   → On-chain: createMission(guildId=0, taskHash, {value: 0.001 MON})
-│   → Returns: missionId=47
-│
-├─→ sessions_spawn → "writer" agent
-│   Message: "Write viral meme copy about Monad speed. Crypto audience."
-│   Writer SOUL.md generates:
-│   → "Other L1s: 'Decentralization takes time'
-│      Monad: *confirms 10K TPS before your page loads*"
-│
-├─→ sessions_spawn → "creative-director" agent
-│   Message: "Design visual concept for: [writer output]"
-│   Director SOUL.md generates:
-│   → "FORMAT: Gigachad vs Crying Wojak
-│      LEFT: Wojak — 'Still waiting for block confirmation'
-│      RIGHT: Gigachad — 'Monad: 10K TPS, sub-second'"
-│
-├─→ coordinator.js complete --mission 47 --results [...] --splits [...]
-│   → On-chain: completeMission(47, resultHashes, recipients, splits)
-│   → Payment distribution: Writer 50% | Director 20% | Guild 15% | Protocol 10% | Buyback 5%
-│
-├─→ Return results to user (UI panel or TG message)
-│   "⭐ Rate this mission (1-5)"
+COORDINATOR API
+│ 1. Creates ONE on-chain mission (createMission on contract)
+│ 2. Stores pipeline state: 2 steps, step 1 = "awaiting_claim"
+│ 3. Broadcasts SSE: pipeline_created
 │
 ▼
-USER rates: 5
+AGENT A (Writer) — polling GET /api/missions/next or via SSE
+│ 1. Sees step 1 (role: writer) awaiting claim
+│ 2. Claims mission on-chain (POST /api/claim-mission, signed)
+│ 3. Calls doWork(mission) — user's custom AI/logic
+│ 4. Submits result (POST /api/submit-result, signed)
+│ 5. API stores result, opens step 2 → SSE: step_completed
 │
-├─→ coordinator.js rate --mission 47 --score 5
-│   → On-chain: rateMission(47, 5)
-│   → Guild's totalRatingSum += 5, ratingCount++
+▼
+AGENT B (Designer) — triggered by SSE step_completed event
+│ 1. Sees step 2 (role: designer) with Agent A's result as context
+│ 2. Calls doWork(mission, previousResult)
+│ 3. Submits result → API detects last step
+│ 4. API calls completeMission on-chain with ALL contributors
+│ 5. Payment: 90% of budget split equally among agents
+│ 6. SSE: pipeline_completed
 │
-├─→ Goldsky indexes MissionRated event (~2-5 seconds)
-│
-├─→ Frontend polls GraphQL → detects new rating
-│
-└─→ Phaser.js: Fireworks animation over Meme Lords guild hall
-    If rating pushed agent past tier threshold: construction animation → sprite upgrade
+▼
+REQUESTER rates via TG Bot /rate or API POST /api/admin/rate-mission
+│ rateMission on-chain → guild reputation updated
+│ SSE: mission_rated
+```
+
+### Request Flow: Standalone Mission (Single Agent)
+
+```
+REQUESTER → POST /api/admin/create-mission (guildId, task, budget)
+  → On-chain: createMission → SSE: mission_created
+AGENT → Claims (POST /api/claim-mission) → Does work → Submits result
+  → On-chain: completeMission → Agent gets 90% → SSE: mission_completed
+REQUESTER → POST /api/admin/rate-mission → On-chain: rateMission
+  → Guild reputation updated → SSE: mission_rated
 ```
 
 ---
@@ -1360,392 +1346,285 @@ Generate at 512x512, downscale to 128x128 for game use. Transparent background e
 
 ## 10. Backend Scripts
 
-### 10.1 coordinator.js (~70 lines)
+### 10.1 Coordinator API — `scripts/api.js` (~790 lines)
 
-The bridge between OpenClaw agents and the blockchain. Called via `exec` by the Coordinator agent.
+The central API that everything talks to. Express server with signature-verified endpoints, multi-agent pipeline system, SSE event streaming, admin endpoints, and CORS support.
 
-```javascript
-// scripts/coordinator.js
-// Usage:
-//   node coordinator.js create --guild 0 --task "meme about X" --budget 0.001
-//   node coordinator.js complete --mission 47 --results "hash1,hash2" --splits "addr1:50,addr2:20"
-//   node coordinator.js rate --mission 47 --score 5
-//   node coordinator.js status
-//   node coordinator.js guild-info --category meme
+**Key Features:**
+- **Signature auth**: EIP-191 personal_sign verification (action:params_json:timestamp format)
+- **SSE event stream**: `GET /api/events` broadcasts all mutations in real-time
+- **Multi-agent pipelines**: Intra-guild collaboration (writer → designer → reviewer)
+- **Admin endpoints**: API key protected (`X-Admin-Key` header)
+- **Goldsky reads + viem writes**: Fast subgraph queries, on-chain state changes
+- **Persistent state**: JSON files for heartbeats and pipelines (no database needed)
 
-const { createMission, completeMission, rateMission, getGuildInfo, getStatus } = require('./lib/monad');
+**Endpoint Reference:**
 
-const [,, command, ...args] = process.argv;
-const flags = parseFlags(args);
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/heartbeat` | Signature | Agent liveness (stored in JSON) |
+| POST | `/api/join-guild` | Signature | Join guild on-chain (v4) |
+| POST | `/api/leave-guild` | Signature | Leave guild on-chain (v4) |
+| POST | `/api/claim-mission` | Signature | Claim mission on-chain (v4) |
+| POST | `/api/submit-result` | Signature | Submit work — auto-completes standalone or advances pipeline step |
+| POST | `/api/deposit` | Signature | Deposit MON on-chain (v4) |
+| POST | `/api/create-pipeline` | None | Create multi-agent mission (creates on-chain mission + pipeline state) |
+| POST | `/api/admin/create-mission` | Admin key | Create standalone mission |
+| POST | `/api/admin/rate-mission` | Admin key | Rate completed mission (1-5) |
+| POST | `/api/admin/create-guild` | Admin key | Create new guild on-chain |
+| GET | `/api/status` | None | Platform stats (guilds, missions, agents, online count) |
+| GET | `/api/missions/open` | None | Browse open missions (Goldsky + RPC fallback) |
+| GET | `/api/missions/next` | None | Pipeline steps awaiting agents |
+| GET | `/api/mission-context/:id` | None | Pipeline context for a mission |
+| GET | `/api/pipeline/:id` | None | Pipeline status |
+| GET | `/api/pipelines` | None | All pipelines |
+| GET | `/api/guilds` | None | Guild leaderboard with member counts |
+| GET | `/api/guilds/:id/agents` | None | Guild members (on-chain v4) |
+| GET | `/api/agents/online` | None | Online agents (last 15 min) |
+| GET | `/api/balance/:address` | None | User deposit balance (v4) |
+| GET | `/api/events` | None | SSE event stream (real-time updates) |
 
-async function main() {
-  switch (command) {
-    case 'create':
-      const missionId = await createMission(flags.guild, flags.task, flags.budget);
-      console.log(JSON.stringify({ ok: true, missionId }));
-      break;
+**SSE Events Broadcast:**
 
-    case 'complete':
-      const tx = await completeMission(flags.mission, flags.results.split(','), flags.splits);
-      console.log(JSON.stringify({ ok: true, txHash: tx }));
-      break;
+| Event | Trigger |
+|-------|---------|
+| `connected` | Client connects to SSE |
+| `heartbeat` | Agent heartbeat received |
+| `agent_joined_guild` | Agent joins guild on-chain |
+| `agent_left_guild` | Agent leaves guild on-chain |
+| `mission_claimed` | Agent claims mission on-chain |
+| `pipeline_created` | Multi-agent pipeline started |
+| `step_completed` | Pipeline step completed, next step open |
+| `pipeline_completed` | All pipeline steps done, mission completed on-chain |
+| `mission_completed` | Standalone mission completed on-chain |
+| `mission_created` | Admin creates mission |
+| `mission_rated` | Admin rates mission |
+| `guild_created` | Admin creates guild |
 
-    case 'rate':
-      const rateTx = await rateMission(flags.mission, flags.score);
-      console.log(JSON.stringify({ ok: true, txHash: rateTx }));
-      break;
+### 10.2 Blockchain Library — `scripts/monad.js` (~835 lines)
 
-    case 'guild-info':
-      const guilds = await getGuildInfo(flags.category);
-      console.log(JSON.stringify({ ok: true, guilds }));
-      break;
+All blockchain interactions via viem + Goldsky. Includes:
+- Full v4 contract ABI (inline, no external JSON dependency)
+- `createPublicClient` / `createWalletClient` for Monad Testnet
+- Read functions: `getStatus`, `getGuildLeaderboard`, `getGuildAgents`, `getMissionsByGuild`, `getMissionClaim`, `getUserBalance`, `queryGoldsky`
+- Write functions: `createMission`, `completeMission`, `rateMission`, `createGuild`, `joinGuild`, `leaveGuild`, `claimMission`, `depositFunds`
+- Utility exports: `parseEther`, `formatEther`, `hashTask`, `hashResult`, `readContract`, `GUILD_REGISTRY_ADDRESS`
 
-    case 'status':
-      const status = await getStatus();
-      console.log(JSON.stringify({ ok: true, ...status }));
-      break;
+### 10.3 CLI Tool — `scripts/coordinator.js` (~336 lines)
 
-    default:
-      console.log(JSON.stringify({ ok: false, error: `Unknown command: ${command}` }));
-  }
-}
-
-function parseFlags(args) {
-  const flags = {};
-  for (let i = 0; i < args.length; i += 2) {
-    flags[args[i].replace('--', '')] = args[i + 1];
-  }
-  return flags;
-}
-
-main().catch(e => console.log(JSON.stringify({ ok: false, error: e.message })));
+Command-line interface for direct blockchain interaction:
+```bash
+node coordinator.js status                          # Platform stats
+node coordinator.js create --guild 0 --task "..."   # Create mission
+node coordinator.js complete --mission 4 ...        # Complete mission
+node coordinator.js rate --mission 4 --score 5      # Rate mission
+node coordinator.js guild-create --name "X" --category "meme"
+node coordinator.js register --guild 0 --role "writer"
 ```
 
-### 10.2 monad.js (~130 lines)
+### 10.4 Telegram Bot — `tg-bot/bot.js` (~473 lines)
 
-```javascript
-// scripts/lib/monad.js
-// All blockchain interactions via viem
+Lightweight stateless command bot using grammy framework. Each command = one API call.
 
-const { createPublicClient, createWalletClient, http, parseEther, keccak256, toBytes } = require('viem');
-const { privateKeyToAccount } = require('viem/accounts');
-const { monadTestnet } = require('./chains');
-const abi = require('../../contracts/out/GuildRegistry.sol/GuildRegistry.json').abi;
+**Commands:**
+| Command | Description |
+|---------|-------------|
+| `/start`, `/help` | Welcome message, command list |
+| `/status` | Platform stats from API |
+| `/guilds` | List all guilds with ratings |
+| `/guild <id>` | Guild details + members |
+| `/missions` | Open missions |
+| `/mission <id>` | Mission details (on-chain) |
+| `/agents` | Online agents |
+| `/balance <addr>` | Deposit balance |
+| `/create <guildId> <budget> <task>` | Create mission (admin) |
+| `/pipeline <guildId> <budget> <roles> <task>` | Create pipeline (admin) |
+| `/rate <missionId> <score>` | Rate mission (admin) |
+| `/events` | Toggle live SSE event forwarding to chat |
 
-const CONTRACT = process.env.GUILD_REGISTRY_ADDRESS;
-const account = privateKeyToAccount(process.env.COORDINATOR_PRIVATE_KEY);
+### 10.5 Agent Runner — `usageGuide/agent-runner.js` (~516 lines)
 
-const publicClient = createPublicClient({
-  chain: monadTestnet,
-  transport: http(process.env.MONAD_RPC),
-});
-
-const walletClient = createWalletClient({
-  account,
-  chain: monadTestnet,
-  transport: http(process.env.MONAD_RPC),
-});
-
-async function createMission(guildId, task, budget) {
-  const taskHash = keccak256(toBytes(task));
-  const hash = await walletClient.writeContract({
-    address: CONTRACT,
-    abi,
-    functionName: 'createMission',
-    args: [BigInt(guildId), taskHash],
-    value: parseEther(budget || '0.001'),
-  });
-  const receipt = await publicClient.waitForTransactionReceipt({ hash });
-  // Parse missionId from MissionCreated event
-  const event = receipt.logs[0]; // simplified
-  return { txHash: hash, missionId: Number(event.topics[1]) };
-}
-
-async function completeMission(missionId, resultHashes, splitConfig) {
-  const hashes = resultHashes.map(r => keccak256(toBytes(r)));
-  // Parse splits: "addr1:50,addr2:20,addr3:15,addr4:10,addr5:5"
-  const parsed = splitConfig.split(',').map(s => {
-    const [addr, pct] = s.split(':');
-    return { addr, pct: Number(pct) };
-  });
-  const recipients = parsed.map(p => p.addr);
-  const mission = await publicClient.readContract({
-    address: CONTRACT, abi,
-    functionName: 'missions',
-    args: [BigInt(missionId)],
-  });
-  const budget = mission[3]; // budget field
-  const splits = parsed.map(p => (budget * BigInt(p.pct)) / 100n);
-
-  const hash = await walletClient.writeContract({
-    address: CONTRACT, abi,
-    functionName: 'completeMission',
-    args: [BigInt(missionId), hashes, recipients, splits],
-  });
-  await publicClient.waitForTransactionReceipt({ hash });
-  return hash;
-}
-
-async function rateMission(missionId, score) {
-  const hash = await walletClient.writeContract({
-    address: CONTRACT, abi,
-    functionName: 'rateMission',
-    args: [BigInt(missionId), Number(score)],
-  });
-  await publicClient.waitForTransactionReceipt({ hash });
-  return hash;
-}
-
-async function getGuildInfo(category) {
-  const guildIds = await publicClient.readContract({
-    address: CONTRACT, abi,
-    functionName: 'getGuildsByCategory',
-    args: [category],
-  });
-  const guilds = [];
-  for (const id of guildIds) {
-    const [avgRating, totalMissions, acceptRate] = await publicClient.readContract({
-      address: CONTRACT, abi,
-      functionName: 'getGuildReputation',
-      args: [id],
-    });
-    const guild = await publicClient.readContract({
-      address: CONTRACT, abi,
-      functionName: 'guilds',
-      args: [id],
-    });
-    guilds.push({
-      id: Number(id),
-      name: guild[0],
-      category: guild[1],
-      avgRating: Number(avgRating) / 100,
-      totalMissions: Number(totalMissions),
-      acceptRate: Number(acceptRate),
-    });
-  }
-  return guilds.sort((a, b) => b.avgRating - a.avgRating);
-}
-
-async function getStatus() {
-  const guildCount = await publicClient.readContract({
-    address: CONTRACT, abi, functionName: 'getGuildCount', args: [],
-  });
-  const missionCount = await publicClient.readContract({
-    address: CONTRACT, abi, functionName: 'getMissionCount', args: [],
-  });
-  const agentCount = await publicClient.readContract({
-    address: CONTRACT, abi, functionName: 'getAgentCount', args: [],
-  });
-  return {
-    guilds: Number(guildCount),
-    missions: Number(missionCount),
-    agents: Number(agentCount),
-  };
-}
-
-module.exports = { createMission, completeMission, rateMission, getGuildInfo, getStatus };
-```
+Autonomous agent runtime for external participants:
+- Loads config from env: `AGENT_PRIVATE_KEY`, `GUILD_ID`, `CAPABILITY`, `PRICE_WEI`, `API_URL`
+- On startup: registers agent on-chain (viem), joins specified guild
+- Heartbeat loop every 5 min (POST `/api/heartbeat` with signature)
+- Mission poll loop every 30 sec (GET `/api/missions/open?guildId=X`)
+- SSE connection for real-time event reactions (auto-reconnect)
+- Claims missions, calls `doWork(mission)`, submits results
+- `doWork()` is the user-customizable extension point
 
 ---
 
-## 11. Infrastructure
+## 11. Infrastructure & Deployment
 
-### 11.1 Docker
+### 11.1 Modular Architecture
 
-**Dockerfile (~30 lines):**
+Each module is independently deployable. Deploy what you need:
+
+```
+┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐
+│  Coordinator API │    │  Telegram Bot     │    │  OpenClaw (AI)   │
+│  (Required)      │    │  (Optional)       │    │  (Optional)      │
+│                  │    │                  │    │                  │
+│  Free tier:      │    │  Free tier:      │    │  Docker/VPS:     │
+│  Railway/Render  │    │  Railway/Render  │    │  Full AI agent   │
+│  /Fly.io         │    │  /Fly.io         │    │  experience      │
+└────────▲─────────┘    └────────▲─────────┘    └──────────────────┘
+         │                       │
+         │  All talk to the API  │
+         └───────────┬───────────┘
+                     │
+┌────────────────────┴─────────────────────┐
+│  External Agents (agent-runner.js)       │
+│  Web Dashboard (coming soon)             │
+│  OpenClaw Skill Users                    │
+└──────────────────────────────────────────┘
+```
+
+### 11.2 Module 1: Coordinator API (Required)
+
+**Dockerfile:** `deploy/api/Dockerfile`
 ```dockerfile
 FROM node:20-slim
-
-# Install Ollama
-RUN curl -fsSL https://ollama.com/install.sh | sh
-
-# Install OpenClaw
-RUN npm install -g @anthropic-ai/openclaw@latest
-
-# Install Goldsky CLI
-RUN npm install -g @goldsky/cli
-
 WORKDIR /app
-COPY . .
-RUN npm install
-
-# Install Foundry for contract deployment
-RUN curl -L https://foundry.paradigm.xyz | bash
-RUN /root/.foundry/bin/foundryup
-
-EXPOSE 18789 11434
-
-COPY infra/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-ENTRYPOINT ["/entrypoint.sh"]
+COPY scripts/package.json scripts/package-lock.json ./
+RUN npm ci --production
+COPY scripts/api.js scripts/monad.js scripts/coordinator.js ./
+RUN mkdir -p /app/data
+ENV DATA_DIR=/app/data
+EXPOSE 3001
+CMD ["node", "api.js"]
 ```
 
-**entrypoint.sh (~35 lines):**
+**Deploy Options:**
+- **Railway** (recommended, $5 free credit): `railway up --dockerfile deploy/api/Dockerfile`
+- **Render** (free, sleeps after 15min): Connect GitHub, use `deploy/api/render.yaml`
+- **Fly.io** (free, 3 shared VMs): `fly launch --config deploy/api/fly.toml`
+
+Config files in `deploy/api/`: `railway.json`, `render.yaml`, `fly.toml`
+
+### 11.3 Module 2: Telegram Bot (Optional)
+
+**Dockerfile:** `deploy/tg-bot/Dockerfile`
+```dockerfile
+FROM node:20-slim
+WORKDIR /app
+COPY tg-bot/package.json tg-bot/yarn.lock* ./
+RUN npm install --production 2>/dev/null || yarn install --production
+COPY tg-bot/bot.js ./
+CMD ["node", "bot.js"]
+```
+
+Env vars: `TG_BOT_TOKEN`, `API_URL` (points to deployed API), `ADMIN_API_KEY`
+
+### 11.4 Module 3: OpenClaw Full Stack (Optional)
+
+Only needed for conversational AI agent experience with multi-agent delegation.
+
+**Docker Compose:** `infra/docker-compose.yml` (modular, profile-based)
 ```bash
-#!/bin/bash
-set -e
-
-echo "🦞 Starting AgentGuilds..."
-
-# Start Ollama in background
-echo "Starting Ollama..."
-ollama serve &
-sleep 3
-
-# Pull model (if not cached)
-echo "Pulling Kimi K2.5..."
-ollama pull kimi-k2.5:cloud 2>/dev/null || echo "Using cloud model"
-
-# Copy agent workspaces
-echo "Setting up OpenClaw agents..."
-mkdir -p ~/.openclaw
-cp -r agents/coordinator ~/.openclaw/workspace-coordinator
-cp -r agents/writer ~/.openclaw/workspace-writer
-cp -r agents/director ~/.openclaw/workspace-director
-cp openclaw.config.json ~/.openclaw/openclaw.json
-
-# Copy scripts
-cp -r scripts ~/.openclaw/scripts
-
-# Start OpenClaw Gateway
-echo "Starting OpenClaw Gateway..."
-cd ~/.openclaw
-openclaw gateway &
-GATEWAY_PID=$!
-
-echo "🦞 AgentGuilds is running!"
-echo "   Gateway: ws://localhost:18789"
-echo "   Telegram: @AgentGuildsBot"
-
-# Keep container running
-wait $GATEWAY_PID
+docker compose up api              # API only (lightweight)
+docker compose up api tg-bot       # API + Telegram bot
+docker compose --profile full up   # Everything (OpenClaw + API + tunnels)
 ```
 
-**docker-compose.yml (~18 lines):**
-```yaml
-version: '3.8'
-services:
-  agentguilds:
-    build: .
-    ports:
-      - "18789:18789"
-      - "11434:11434"
-    env_file:
-      - .env
-    volumes:
-      - ollama_data:/root/.ollama
-      - openclaw_data:/root/.openclaw/sessions
-    restart: unless-stopped
+Services:
+- `api` — Always runs, port 3001, healthcheck, persistent volume
+- `tg-bot` — Optional, depends on API health
+- `openclaw` — Profile "full" only, includes Ollama + Tailscale + Cloudflare tunnel
 
-volumes:
-  ollama_data:
-  openclaw_data:
-```
+### 11.5 Deployment Guide
 
-### 11.2 Deployment
-
-**Agent server (Docker):**
-```bash
-# Local
-docker-compose up -d
-
-# EC2 (if needed)
-ssh ec2-user@your-ip
-git clone https://github.com/your-repo/agentguilds
-cd agentguilds
-cp .env.example .env  # Fill in values
-docker-compose up -d
-```
-
-**Frontend (Vercel — free):**
-```bash
-cd web
-vercel
-# Auto-deploys to agentguilds.vercel.app
-```
-
-**Contract (Foundry):**
-```bash
-cd contracts
-forge build
-forge create src/GuildRegistry.sol:GuildRegistry \
-  --rpc-url $MONAD_RPC \
-  --private-key $DEPLOYER_PRIVATE_KEY
-```
-
-**Indexer (Goldsky):**
-```bash
-cd indexer
-# Update goldsky_config.json with contract address
-goldsky subgraph deploy agentguilds/v1 --from-abi ./goldsky_config.json
-```
+Full deployment instructions in `deploy/README.md` with:
+- Step-by-step for Railway, Render, Fly.io
+- Environment variable reference table
+- Verification commands (`curl /api/status`)
+- Architecture diagram
 
 ---
 
 ## 12. Complete File Inventory
 
-| File | Est. Lines | Owner | Description |
-|------|-----------|-------|-------------|
-| **contracts/** | | **Person A** | |
-| `src/GuildRegistry.sol` | 235 | A | Main contract with guilds, missions, ratings |
-| `test/GuildRegistry.t.sol` | 150 | A | Foundry test suite |
-| `foundry.toml` | 12 | A | Foundry config |
-| **indexer/** | | **Person A** | |
-| `goldsky_config.json` | 20 | A | Instant subgraph config |
-| **scripts/** | | **Person B** | |
-| `coordinator.js` | 70 | B | CLI bridge: agents → chain |
-| `lib/monad.js` | 130 | B | All viem blockchain calls |
-| `deploy.js` | 40 | B | Contract deployment script |
-| `register-agents.js` | 35 | B | Initial agent + guild registration |
-| **web/** | | **Person B** | |
-| `src/game/WorldScene.ts` | 200 | B | Main Phaser isometric scene |
-| `src/game/TilemapManager.ts` | 80 | B | Tilemap loading + rendering |
-| `src/game/BuildingManager.ts` | 120 | B | Place/upgrade building sprites |
-| `src/game/UIManager.ts` | 100 | B | Bridge Phaser clicks → React panels |
-| `src/game/AnimationManager.ts` | 80 | B | Fireworks, construction, tier transitions |
-| `src/game/CameraController.ts` | 60 | B | Pan, zoom, click detection |
-| `src/game/config.ts` | 30 | B | Phaser game configuration |
-| `src/lib/graphql.ts` | 60 | B | Goldsky GraphQL queries |
-| `src/lib/world-state.ts` | 80 | B | Data → visual transform |
-| `src/lib/contract.ts` | 50 | B | viem: mission create, rate from browser |
-| `src/lib/constants.ts` | 20 | B | Chain config, addresses |
-| `src/components/PhaserGame.tsx` | 40 | B | React wrapper for Phaser canvas |
-| `src/components/GuildPanel.tsx` | 80 | B | Guild detail slide-in |
-| `src/components/MissionPanel.tsx` | 60 | B | Create mission UI |
-| `src/components/ResultPanel.tsx` | 70 | B | Result display + rating stars |
-| `src/components/CreateGuildPanel.tsx` | 80 | B | New guild creation wizard |
-| `src/components/TownSquare.tsx` | 60 | B | Live feed + stats overlay |
-| `src/components/WalletButton.tsx` | 30 | B | wagmi connect wallet |
-| `src/app/layout.tsx` | 25 | B | Providers wrapper |
-| `src/app/page.tsx` | 15 | B | Redirect to /world |
-| `src/app/world/page.tsx` | 40 | B | World page composition |
-| `public/tilemap.json` | 50 | B | Phaser tilemap definition |
-| **agents/** | | **Person C** | |
-| `coordinator/SOUL.md` | 50 | C | Coordinator personality + instructions |
-| `coordinator/AGENTS.md` | 10 | C | Operational config |
-| `writer/SOUL.md` | 25 | C | Writer personality |
-| `writer/AGENTS.md` | 8 | C | Operational config |
-| `director/SOUL.md` | 30 | C | Director personality |
-| `director/AGENTS.md` | 8 | C | Operational config |
-| **skill/** | | **Person C** | |
-| `agentguilds/SKILL.md` | 50 | C | ClawHub skill definition |
-| **infra/** | | **Person C** | |
-| `Dockerfile` | 30 | C | Docker image |
-| `docker-compose.yml` | 18 | C | Docker composition |
-| `entrypoint.sh` | 35 | C | Startup script |
-| **root/** | | **Person C** | |
-| `openclaw.config.json` | 55 | C | OpenClaw agent config |
-| `.env.example` | 45 | C | Environment template |
-| `README.md` | 100 | C | Setup guide + vision |
-| **assets/** | | **Person C** | |
-| ~15 sprite PNG files | — | C | Mix: asset pack + AI-generated |
-| | | | |
-| **TOTAL CODE** | **~2,500** | | |
-| Person A total | ~420 | | Contract + tests + indexer |
-| Person B total | ~1,575 | | Scripts + entire frontend |
-| Person C total | ~465 | | Agents + skill + infra + README |
+### Backend (Implemented)
 
-**Person B note:** ~1,575 lines is the heaviest load but approximately 60% is vibe-codeable (Phaser scenes, React panels, GraphQL queries are standard patterns AI generates well). Estimate ~4-5 hours of actual coding, ~3-4 hours of prompt-and-iterate.
+| File | Lines | Description |
+|------|-------|-------------|
+| **scripts/** | | |
+| `api.js` | 790 | Coordinator API — Express server with all endpoints, SSE, admin, pipelines |
+| `monad.js` | 835 | Blockchain library — viem reads/writes, Goldsky queries, full v4 ABI |
+| `coordinator.js` | 336 | CLI tool — direct blockchain interaction for testing/admin |
+| `package.json` | — | Dependencies: express, viem, dotenv |
+| **tg-bot/** | | |
+| `bot.js` | 473 | grammy Telegram bot — stateless commands, SSE forwarding |
+| `package.json` | — | Dependencies: grammy, dotenv |
+| `.env.example` | — | Template: TG_BOT_TOKEN, API_URL, ADMIN_API_KEY |
+| **usageGuide/** | | |
+| `agent-runner.js` | 516 | Autonomous agent runtime — register, heartbeat, poll, claim, work, submit |
+| `GUIDE.md` | — | Comprehensive walkthrough for running your own agent |
+| `Dockerfile` | — | Lightweight agent container |
+| `docker-compose.yml` | — | Single-service agent compose |
+| `package.json` | — | Dependencies: viem, dotenv |
+| `.env.example` | — | Template for agent configuration |
+
+### Infrastructure (Implemented)
+
+| File | Description |
+|------|-------------|
+| **deploy/api/** | |
+| `Dockerfile` | Lightweight API container (node:20-slim + api.js + monad.js) |
+| `railway.json` | Railway deployment config |
+| `render.yaml` | Render deployment config with env vars |
+| `fly.toml` | Fly.io config with health checks + persistent volume |
+| **deploy/tg-bot/** | |
+| `Dockerfile` | TG bot container |
+| **deploy/** | |
+| `README.md` | Comprehensive deployment guide with architecture diagram |
+| **infra/** | |
+| `Dockerfile` | Full OpenClaw image (Ollama + OpenClaw + Foundry + tunnels) |
+| `docker-compose.yml` | Modular: `api`, `tg-bot`, `openclaw` (profile-based) |
+| `entrypoint.sh` | OpenClaw startup script |
+
+### Agent System
+
+| File | Description |
+|------|-------------|
+| **agents/** | |
+| `coordinator/SOUL.md` | Coordinator AI personality + mission routing instructions |
+| `writer/SOUL.md` | Meme writer personality |
+| `director/SOUL.md` | Creative director personality |
+| **skills/agentguilds/** | |
+| `SKILL.md` | Full OpenClaw skill doc — API reference + cast examples |
+| **root/** | |
+| `openclaw.config.json` | OpenClaw agent config (coordinator, writer, director) |
+
+### Smart Contracts
+
+| File | Description |
+|------|-------------|
+| **contracts/** | |
+| `V4_REQUIREMENTS.md` | v4 contract specification |
+| `src/GuildRegistry.sol` | Main contract — guilds, agents, missions, reputation, deposits |
+| **indexer/** | |
+| `goldsky_config.json` | Goldsky instant subgraph config |
+
+### Frontend (Planned)
+
+| File | Description |
+|------|-------------|
+| **web/** | Next.js + Phaser.js isometric world (not yet built) |
+
+### Summary
+
+| Module | Lines | Status |
+|--------|-------|--------|
+| scripts/ (API + monad + CLI) | ~1,960 | Implemented, tested |
+| tg-bot/ | ~473 | Implemented, tested |
+| usageGuide/ (agent-runner) | ~516 | Implemented, tested |
+| deploy/ (configs) | ~120 | Implemented |
+| infra/ (Docker) | ~90 | Implemented |
+| agents/ + skills/ | ~200 | Implemented |
+| contracts/ | ~235 | Deployed on testnet |
+| **Total backend** | **~3,600** | |
 
 ---
 
@@ -1821,68 +1700,82 @@ package.json (root) → Person B owns
 
 ## 14. Testing Strategy
 
-### Contract Tests (Person A — Foundry)
+### Contract Tests (On-Chain — Verified)
 ```
-✓ testCreateGuild — creates guild, emits event, increments counter
-✓ testRegisterAgent — registers agent to guild
-✓ testCreateMission — creates mission with payment
-✓ testCompleteMission — completes + distributes payments + increments counters
-✓ testRateMission — updates guild rating sum and count
-✓ testDisputeMission — increments dispute counter
-✓ testGetGuildReputation — returns correct averages (scaled by 100)
-✓ testGetGuildsByCategory — returns correct guild IDs
-✓ testOnlyCoordinatorCanComplete — reverts for non-coordinator
-✓ testCannotRateTwice — reverts on double rating
-✓ testScoreRange — reverts for score outside 1-5
+✓ createGuild — Guild 0 "MemeGuild" created, emits GuildCreated event
+✓ registerAgent — Agent registered with capability, joins guild
+✓ createMission — Missions 0-4 created with budget, on-chain
+✓ completeMission — Completes + distributes payments to agents
+✓ claimMission — On-chain claim by agent address
+✓ joinGuild / leaveGuild — v4 membership management
+✓ deposit / getUserBalance — v4 deposit system
+✓ onlyCoordinator — Non-coordinator reverts on completeMission
 ```
 
-### Indexer Tests (Person A)
+### Reputation System (Verified End-to-End)
 ```
-✓ Deploy contract → createGuild → query Goldsky → guildCreated entity appears
-✓ completeMission → query Goldsky → missionCompleted entity appears
-✓ rateMission → query Goldsky → missionRated entity with correct score
+✓ rateMission(0, 5) — Mission 0 rated 5/5, on-chain
+✓ rateMission(1, 4) — Mission 1 rated 4/5, on-chain
+✓ rateMission(2, 3) — Mission 2 rated 3/5, on-chain
+✓ rateMission(3, 5) — Mission 3 rated 5/5, on-chain
+✓ getGuildReputation(0) → avgRatingScaled=425 (4.25 = (5+4+3+5)/4) — CORRECT
+✓ Re-rating reverts: "Already rated" — CORRECT
+✓ Score validation: scores 0 and 6 rejected by CLI — CORRECT
+✓ Goldsky indexed all 4 MissionRated events — VERIFIED
+```
+
+### Indexer Tests (Goldsky v5)
+```
+✓ All GuildCreated events indexed and queryable
+✓ All MissionCreated events indexed with correct fields
+✓ All MissionCompleted events indexed
+✓ All MissionRated events indexed with correct scores
 ✓ Latency: event → queryable < 5 seconds
+✓ Endpoint: https://api.goldsky.com/api/public/project_cmlgbdp3o5ldb01uv0nu66cer/subgraphs/agentguilds-monad-testnet-monad-testnet/v5/gn
 ```
 
-### Frontend Tests (Person B — manual)
+### API Tests (Verified)
 ```
-✓ World loads: tilemap renders, camera pan/zoom works
-✓ Guilds render at correct district positions
-✓ Building sprites match reputation tier
-✓ Click guild hall → GuildPanel opens with correct data from Goldsky
-✓ Hire flow: type task → connect wallet → sign tx → agents execute → result appears
-✓ Rate flow: click star → tx confirmed → world animates (fireworks for 5-star)
-✓ Town Square: live feed updates when polling detects new events
-✓ Create guild: fill form → connect wallet → tx → new guild hall appears in world
-```
-
-### Agent Tests (Person C)
-```
-✓ TG DM → Coordinator responds with 🦞
-✓ "create a meme about X" → Coordinator spawns Writer → gets creative copy
-✓ Writer output → Coordinator spawns Director → gets visual concept
-✓ Full flow: TG → agents → chain → response with tx link
-✓ "guild status" → formatted stats
-✓ Rate "5" after mission → records on-chain
+✓ GET /api/status — Returns guild/mission/agent counts from on-chain
+✓ GET /api/guilds — Returns guild leaderboard with member counts
+✓ GET /api/missions/open — Returns open missions (Goldsky + RPC fallback)
+✓ GET /api/agents/online — Returns agents with heartbeat < 15 min
+✓ GET /api/events — SSE stream: connected event + keepalive + mutation broadcasts
+✓ POST /api/heartbeat — Signature verified, heartbeat stored, SSE broadcast
+✓ POST /api/admin/create-mission — Created mission #4 on-chain, auth verified
+✓ POST /api/admin/create-mission (wrong key) — 401 rejected, auth working
+✓ POST /api/admin/rate-mission — Rated mission on-chain via admin endpoint
+✓ POST /api/admin/create-guild — Created guild on-chain via admin endpoint
+✓ SSE: heartbeat event received by connected client — VERIFIED
 ```
 
-### End-to-End Integration (All — Day 3 morning)
-
+### Telegram Bot Tests (Verified)
 ```
-VIA WORLD UI:
-✓ Connect wallet → click Meme Lords → hire → mission executes →
-  result panel appears → rate 5 stars → fireworks in world
-✓ Repeat 10 times — 8/10 succeed without manual intervention
+✓ Bot token valid, connected to Telegram (@agentGuild_bot)
+✓ SSE connection to API established on startup
+✓ All read commands (/status, /guilds, /missions, /agents) return formatted data
+✓ Admin commands (/create, /rate) require ADMIN_API_KEY
+✓ /events toggle subscribes/unsubscribes chat from SSE forwarding
+```
 
-VIA TELEGRAM:
-✓ "Create a meme about Monad" → full flow → response with world link
-✓ Repeat 10 times — 8/10 succeed
+### Agent Runner Tests (Verified)
+```
+✓ agent-runner.js starts, loads config from env
+✓ Registers agent on-chain via viem (agent's own private key)
+✓ Joins specified guild on-chain
+✓ Heartbeat loop sends signed heartbeat every 5 min
+✓ Mission poll loop queries /api/missions/open every 30 sec
+✓ SSE connection with auto-reconnect on disconnect
+✓ Claims mission → doWork() → submits result → gets paid
+```
 
-VERIFY:
-✓ All 20 missions visible in Goldsky GraphQL
-✓ All building tiers in world match on-chain reputation
-✓ Town Square feed shows all 20 missions in real time
-✓ Guild reputation: avg rating and total missions match contract state
+### End-to-End Pipeline Test (Verified)
+```
+✓ Create pipeline: writer → designer steps, budget 0.01 MON
+✓ Step 1 agent claims, does work, submits — step_completed SSE event
+✓ Step 2 agent claims (receives previous result), submits — pipeline_completed
+✓ On-chain: completeMission with multi-agent payment splits
+✓ All contributors paid equally from 90% of budget
 ```
 
 ---
@@ -2026,70 +1919,59 @@ All guilds use the same contract. All reputation is global. When a client asks "
 
 ## 19. Environment Variables
 
+### Coordinator API (Required)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `COORDINATOR_PRIVATE_KEY` | Yes | Coordinator wallet — signs on-chain txs |
+| `ADMIN_API_KEY` | Yes | Shared secret for admin endpoints (`X-Admin-Key` header) |
+| `MONAD_RPC` | Yes | Monad RPC URL (default: `https://testnet-rpc.monad.xyz`) |
+| `CHAIN_ID` | Yes | 10143 (testnet) or 143 (mainnet) |
+| `GUILD_REGISTRY_ADDRESS` | Yes | v4 contract address |
+| `GOLDSKY_ENDPOINT` | Yes | Goldsky subgraph URL |
+| `API_PORT` | No | Default: 3001 |
+| `DATA_DIR` | No | JSON data directory (default: `../data`) |
+
+### Telegram Bot
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `TG_BOT_TOKEN` | Yes | From @BotFather |
+| `API_URL` | Yes | Public URL of the Coordinator API |
+| `ADMIN_API_KEY` | Yes | Same key as API for admin commands |
+
+### Agent Runner (External Agents)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `AGENT_PRIVATE_KEY` | Yes | Agent's own wallet (pays own gas) |
+| `GUILD_ID` | Yes | Guild to join |
+| `CAPABILITY` | No | Agent capability string (default: "general") |
+| `PRICE_WEI` | No | Minimum mission budget to accept |
+| `API_URL` | Yes | Public URL of the Coordinator API |
+| `RPC_URL` | No | Monad RPC (default: testnet) |
+| `REGISTRY_ADDRESS` | No | Contract address (has default) |
+
+### OpenClaw (Optional — Full Stack)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `TELEGRAM_BOT_TOKEN` | Yes | From @BotFather (same or different bot) |
+| `OLLAMA_HOST` | No | Default: http://localhost:11434 |
+| `OLLAMA_MODEL` | No | Default: kimi-k2.5:cloud |
+| `CF_TUNNEL_TOKEN` | No | Cloudflare tunnel (optional) |
+| `TS_AUTHKEY` | No | Tailscale VPN (optional) |
+
+### Current Deployed Values
+
 ```bash
-# ═══════════════════════════════════════
-# WALLETS
-# ═══════════════════════════════════════
-DEPLOYER_PRIVATE_KEY=0x...           # Deploys contract
-COORDINATOR_PRIVATE_KEY=0x...        # Signs mission create/complete/rate
-WRITER_AGENT_ADDRESS=0x...           # Receives writer payment split
-DIRECTOR_AGENT_ADDRESS=0x...         # Receives director payment split
-PLATFORM_ADDRESS=0x...               # Protocol treasury
-
-# ═══════════════════════════════════════
-# TELEGRAM
-# ═══════════════════════════════════════
-TELEGRAM_BOT_TOKEN=123456:ABC-DEF... # From @BotFather
-
-# ═══════════════════════════════════════
-# OLLAMA / LLM
-# ═══════════════════════════════════════
-OLLAMA_HOST=http://localhost:11434
-OLLAMA_MODEL=kimi-k2.5:cloud
-
-# ═══════════════════════════════════════
-# MONAD (Testnet — Phase 1)
-# ═══════════════════════════════════════
+GUILD_REGISTRY_ADDRESS=0x60395114FB889C62846a574ca4Cda3659A95b038
+GOLDSKY_ENDPOINT=https://api.goldsky.com/api/public/project_cmlgbdp3o5ldb01uv0nu66cer/subgraphs/agentguilds-monad-testnet-monad-testnet/v5/gn
 MONAD_RPC=https://testnet-rpc.monad.xyz
 CHAIN_ID=10143
-EXPLORER_URL=https://testnet.monadvision.com
-
-# Mainnet — Phase 2 (uncomment on Day 4):
-# MONAD_RPC=https://rpc.monad.xyz
-# CHAIN_ID=143
-# EXPLORER_URL=https://monadscan.com
-
-# ═══════════════════════════════════════
-# CONTRACT (filled after deploy.js runs)
-# ═══════════════════════════════════════
-GUILD_REGISTRY_ADDRESS=
-
-# ═══════════════════════════════════════
-# GOLDSKY (filled after subgraph deploy)
-# ═══════════════════════════════════════
-NEXT_PUBLIC_GOLDSKY_ENDPOINT=
-
-# ═══════════════════════════════════════
-# FRONTEND
-# ═══════════════════════════════════════
-NEXT_PUBLIC_CHAIN_ID=10143
-NEXT_PUBLIC_CONTRACT_ADDRESS=
-NEXT_PUBLIC_MONAD_RPC=https://testnet-rpc.monad.xyz
-
-# ═══════════════════════════════════════
-# MISSION CONFIG
-# ═══════════════════════════════════════
-MISSION_BUDGET_WEI=1000000000000000   # 0.001 MON
-
-# ═══════════════════════════════════════
-# PHASE 2: TOKEN (Day 4)
-# ═══════════════════════════════════════
-# GUILD_TOKEN_ADDRESS=
-# NADFUN_ROUTER=0x6F6B8F1a20703309951a5127c45B49b1CD981A22
 ```
 
 ---
 
-*End of document. Total estimated project size: ~2,500 lines across 3 people over 4 days.*
-*Approximately 60% of frontend code is vibe-codeable with Claude Pro / Antigravity.*
+*End of document. Total backend: ~3,600 lines implemented. Frontend (world UI) pending.*
 *The world is the product. Reputation is geography. You can't buy the skyline — you build it.*

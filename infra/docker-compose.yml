@@ -1,27 +1,105 @@
+# MoltiGuild Modular Docker Compose
+#
+# Usage:
+#   docker compose up api              # API only (lightweight)
+#   docker compose up api tg-bot       # API + Telegram bot
+#   docker compose --profile full up   # API + OpenClaw (conversational AI)
+#   docker compose --profile full --profile local-ai up  # + self-hosted Ollama
+#
+# The API is always required. Everything else is optional.
+
 services:
-  agentguilds:
+  # ═══════════════════════════════════════
+  # COORDINATOR API (lightweight, always needed)
+  # ═══════════════════════════════════════
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/api/Dockerfile
+    container_name: moltiguild-api
+    ports:
+      - "3001:3001"
+    env_file:
+      - ../.env
+    environment:
+      - DATA_DIR=/app/data
+    volumes:
+      - app_data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/status"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ═══════════════════════════════════════
+  # TELEGRAM BOT (lightweight, optional)
+  # ═══════════════════════════════════════
+  tg-bot:
+    build:
+      context: ..
+      dockerfile: deploy/tg-bot/Dockerfile
+    container_name: moltiguild-tg-bot
+    env_file:
+      - ../.env
+    environment:
+      - API_URL=http://api:3001
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ═══════════════════════════════════════
+  # OPENCLAW GATEWAY (conversational AI)
+  # Lightweight: just Node + pnpm. No Ollama/Tailscale.
+  # Uses Ollama Cloud API by default (see openclaw.config.json).
+  # ═══════════════════════════════════════
+  openclaw:
+    profiles: ["full"]
     build:
       context: ..
       dockerfile: infra/Dockerfile
-    container_name: agentguilds
+    container_name: moltiguild-openclaw
     ports:
-      - "18789:18789"  # OpenClaw Gateway (if available)
-      - "11434:11434"  # Ollama API
+      - "18789:18789"
     env_file:
       - ../.env
     volumes:
-      - ollama_data:/root/.ollama
+      - ../openclaw-repo:/app/openclaw-repo            # Source code (bind mount from host)
+      - openclaw_modules:/app/openclaw-repo/node_modules  # Deps cache (named volume, fast Linux fs)
+      - pnpm_store:/root/.local/share/pnpm/store          # Download cache (survives node_modules wipe)
       - openclaw_data:/root/.openclaw/sessions
+    depends_on:
+      api:
+        condition: service_healthy
     restart: unless-stopped
-    networks:
-      - agentguilds-network
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+
+  # ═══════════════════════════════════════
+  # OLLAMA (optional, for self-hosted models)
+  # Only needed if you want local AI instead of Ollama Cloud.
+  # Update openclaw.config.json baseUrl to http://ollama:11434
+  # ═══════════════════════════════════════
+  ollama:
+    profiles: ["local-ai"]
+    image: ollama/ollama:latest
+    container_name: moltiguild-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
 
 volumes:
-  ollama_data:
+  app_data:
     driver: local
   openclaw_data:
     driver: local
-
-networks:
-  agentguilds-network:
-    driver: bridge
+  openclaw_modules:
+    driver: local
+  pnpm_store:
+    driver: local
+  ollama_data:
+    driver: local
