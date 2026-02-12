@@ -3,7 +3,8 @@
 # Usage:
 #   docker compose up api              # API only (lightweight)
 #   docker compose up api tg-bot       # API + Telegram bot
-#   docker compose --profile full up   # Everything (OpenClaw + API + tunnels)
+#   docker compose --profile full up   # API + OpenClaw (conversational AI)
+#   docker compose --profile full --profile local-ai up  # + self-hosted Ollama
 #
 # The API is always required. Everything else is optional.
 
@@ -49,11 +50,9 @@ services:
     restart: unless-stopped
 
   # ═══════════════════════════════════════
-  # FULL STACK: OpenClaw + AI agents + tunnels
-  # Only needed for conversational AI experience
-  #
-  # Mount openclaw-repo if you have it:
-  #   docker compose --profile full up
+  # OPENCLAW GATEWAY (conversational AI)
+  # Lightweight: just Node + pnpm. No Ollama/Tailscale.
+  # Uses Ollama Cloud API by default (see openclaw.config.json).
   # ═══════════════════════════════════════
   openclaw:
     profiles: ["full"]
@@ -66,11 +65,10 @@ services:
     env_file:
       - ../.env
     volumes:
-      - ollama_data:/root/.ollama
+      - ../openclaw-repo:/app/openclaw-repo            # Source code (bind mount from host)
+      - openclaw_modules:/app/openclaw-repo/node_modules  # Deps cache (named volume, fast Linux fs)
+      - pnpm_store:/root/.local/share/pnpm/store          # Download cache (survives node_modules wipe)
       - openclaw_data:/root/.openclaw/sessions
-      - app_data:/app/data
-      # Mount openclaw-repo from host if available:
-      # - ../openclaw-repo:/app/openclaw-repo
     depends_on:
       api:
         condition: service_healthy
@@ -78,17 +76,30 @@ services:
     dns:
       - 8.8.8.8
       - 8.8.4.4
-    # Uncomment for Tailscale VPN support (Linux only):
-    # devices:
-    #   - /dev/net/tun:/dev/net/tun
-    # cap_add:
-    #   - NET_ADMIN
-    #   - NET_RAW
+
+  # ═══════════════════════════════════════
+  # OLLAMA (optional, for self-hosted models)
+  # Only needed if you want local AI instead of Ollama Cloud.
+  # Update openclaw.config.json baseUrl to http://ollama:11434
+  # ═══════════════════════════════════════
+  ollama:
+    profiles: ["local-ai"]
+    image: ollama/ollama:latest
+    container_name: moltiguild-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
 
 volumes:
   app_data:
     driver: local
-  ollama_data:
-    driver: local
   openclaw_data:
+    driver: local
+  openclaw_modules:
+    driver: local
+  pnpm_store:
+    driver: local
+  ollama_data:
     driver: local

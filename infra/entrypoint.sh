@@ -1,137 +1,83 @@
 #!/bin/bash
 set -e
 
-echo "Starting AgentGuilds..."
+echo "═══════════════════════════════════════"
+echo "  MoltiGuild OpenClaw — Starting"
+echo "═══════════════════════════════════════"
 
-# ═══════════════════════════════════════
-# SETUP OPENCLAW WORKSPACE
-# ═══════════════════════════════════════
+# ── SETUP OPENCLAW WORKSPACE ─────────────
 
 mkdir -p ~/.openclaw/agents
 
-# Copy agent configurations
 cp -r /app/agents/coordinator ~/.openclaw/agents/ 2>/dev/null || true
 cp -r /app/agents/writer ~/.openclaw/agents/ 2>/dev/null || true
 cp -r /app/agents/director ~/.openclaw/agents/ 2>/dev/null || true
-
-# Copy OpenClaw config
 cp /app/openclaw.config.json ~/.openclaw/openclaw.json 2>/dev/null || true
 
-# Create data directory for API state
-mkdir -p /app/data
+# ── VERIFY OPENCLAW REPO ─────────────────
 
-# ═══════════════════════════════════════
-# BUILD OPENCLAW (if repo is mounted)
-# ═══════════════════════════════════════
-
-OPENCLAW_AVAILABLE=false
-
-if [ -d "/app/openclaw-repo" ]; then
-    echo "OpenClaw repo found, building..."
-    cd /app/openclaw-repo
-
-    # Install pnpm (OpenClaw uses pnpm)
-    npm install -g pnpm@10.23.0 2>/dev/null || true
-
-    # Install dependencies and build
-    echo "Installing dependencies (this may take a few minutes)..."
-    pnpm install --frozen-lockfile 2>&1 | tail -n 5 || pnpm install 2>&1 | tail -n 5
-
-    echo "Building OpenClaw..."
-    pnpm build 2>&1 | tail -n 10 || true
-
-    # Link OpenClaw globally
-    npm link 2>/dev/null || pnpm link --global 2>/dev/null || true
-
-    OPENCLAW_AVAILABLE=true
-else
-    echo "No openclaw-repo found — running API-only mode"
-    echo "To enable OpenClaw, mount the repo: -v /path/to/openclaw-repo:/app/openclaw-repo"
+if [ ! -d "/app/openclaw-repo" ]; then
+    echo "ERROR: openclaw-repo not mounted at /app/openclaw-repo"
+    echo "Mount it in docker-compose.yml or run: docker compose up api (API-only mode)"
+    exit 1
 fi
 
-# ═══════════════════════════════════════
-# INSTALL CLAWHUB SKILLS
-# ═══════════════════════════════════════
+cd /app/openclaw-repo
 
-if [ "$OPENCLAW_AVAILABLE" = true ]; then
-    echo "Installing Clawhub skills..."
+# ── INSTALL DEPENDENCIES ─────────────────
+# node_modules is on a named Docker volume — persists across restarts.
+# pnpm store is also on a named volume — downloads persist even if node_modules is wiped.
+
+if [ -d "node_modules/.pnpm" ]; then
+    echo "[deps] Cached in volume, skipping install."
+else
+    echo "[deps] Installing (first run — caching in volume for next time)..."
+    START_TIME=$(date +%s)
+    pnpm install --frozen-lockfile 2>&1 || pnpm install 2>&1
+    ELAPSED=$(( $(date +%s) - START_TIME ))
+    echo "[deps] Done in ${ELAPSED}s. Next restart will skip this step."
+fi
+
+# ── BUILD ─────────────────────────────────
+# dist/ lives on the bind mount — persists on host across restarts.
+# Only rebuild if dist/ is missing or empty.
+
+if [ -d "dist" ] && [ "$(ls -A dist 2>/dev/null)" ]; then
+    echo "[build] dist/ exists, skipping build."
+else
+    echo "[build] Building OpenClaw..."
+    START_TIME=$(date +%s)
+    pnpm build 2>&1 || true
+    ELAPSED=$(( $(date +%s) - START_TIME ))
+    echo "[build] Done in ${ELAPSED}s."
+fi
+
+# ── INSTALL CLAWHUB SKILLS ────────────────
+
+if command -v clawhub &>/dev/null; then
+    echo "[skills] clawhub already installed."
+else
+    echo "[skills] Installing clawhub..."
     npm i -g clawhub 2>/dev/null || true
-    clawhub install monad-development --force 2>/dev/null || true
-    echo "Skills installed: agentguilds (local), monad-development (clawhub)"
 fi
+clawhub install monad-development --force 2>/dev/null || true
 
-# ═══════════════════════════════════════
-# START CLOUDFLARE TUNNEL (if configured)
-# ═══════════════════════════════════════
+# ── CLOUDFLARE TUNNEL (if configured) ────
 
 if [ -n "$CF_TUNNEL_TOKEN" ]; then
-    echo "Starting Cloudflare Tunnel..."
+    echo "[tunnel] Starting Cloudflare Tunnel..."
     cloudflared tunnel run --token "$CF_TUNNEL_TOKEN" &
-    CF_PID=$!
-    echo "Cloudflare Tunnel started (PID: $CF_PID)"
+    echo "[tunnel] Cloudflare Tunnel started (PID: $!)"
 else
-    echo "CF_TUNNEL_TOKEN not set — skipping Cloudflare Tunnel"
+    echo "[tunnel] CF_TUNNEL_TOKEN not set, skipping."
 fi
 
-# ═══════════════════════════════════════
-# START TAILSCALE (if configured)
-# ═══════════════════════════════════════
-
-if [ -n "$TS_AUTHKEY" ]; then
-    echo "Starting Tailscale..."
-    tailscaled --state=/var/lib/tailscale/tailscaled.state &
-    sleep 2
-    tailscale up --authkey="$TS_AUTHKEY" --hostname=agentguilds
-    echo "Tailscale connected"
-    tailscale status
-else
-    echo "TS_AUTHKEY not set — skipping Tailscale"
-fi
-
-# ═══════════════════════════════════════
-# START COORDINATOR API
-# ═══════════════════════════════════════
-
-echo "Starting Coordinator API on port ${API_PORT:-3001}..."
-cd /app/scripts
-node api.js &
-API_PID=$!
-echo "Coordinator API started (PID: $API_PID)"
-
-# ═══════════════════════════════════════
-# START OPENCLAW GATEWAY (if available)
-# ═══════════════════════════════════════
-
-OPENCLAW_PID=""
-
-if [ "$OPENCLAW_AVAILABLE" = true ]; then
-    echo "Starting OpenClaw gateway..."
-    cd /app/openclaw-repo
-    pnpm start gateway --port 18789 --bind lan &
-    OPENCLAW_PID=$!
-    sleep 5
-fi
+# ── START GATEWAY ─────────────────────────
 
 echo ""
-echo "AgentGuilds is running!"
-echo "   Coordinator API:  http://localhost:${API_PORT:-3001}"
-if [ "$OPENCLAW_AVAILABLE" = true ]; then
-    echo "   OpenClaw Gateway: http://localhost:18789"
-fi
-if [ -n "$CF_TUNNEL_TOKEN" ]; then
-    echo "   Cloudflare Tunnel: active"
-fi
-if [ -n "$TS_AUTHKEY" ]; then
-    echo "   Tailscale: active"
-fi
+echo "═══════════════════════════════════════"
+echo "  OpenClaw Gateway: http://0.0.0.0:18789"
+echo "═══════════════════════════════════════"
 echo ""
 
-# Keep container running and handle shutdown gracefully
-trap "echo 'Shutting down...'; kill ${OPENCLAW_PID:-0} $API_PID ${CF_PID:-0} 2>/dev/null; tailscale down 2>/dev/null; exit 0" SIGTERM SIGINT
-
-# Wait on the main process — API if no OpenClaw, OpenClaw if available
-if [ -n "$OPENCLAW_PID" ]; then
-    wait $OPENCLAW_PID
-else
-    wait $API_PID
-fi
+exec pnpm start gateway --port 18789 --bind lan

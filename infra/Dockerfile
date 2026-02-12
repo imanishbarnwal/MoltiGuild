@@ -1,39 +1,32 @@
 FROM node:22-slim
 
-# Install dependencies for Ollama, Tailscale, and Cloudflare
+# Minimal deps: git for pnpm, curl for health checks
 RUN apt-get update && apt-get install -y \
     curl \
-    bash \
-    zstd \
-    ca-certificates \
     git \
-    iptables \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Ollama
-RUN curl -fsSL https://ollama.com/install.sh | sh
+# Install pnpm (OpenClaw uses pnpm workspaces)
+RUN npm install -g pnpm@10.23.0
 
-# Install Cloudflare Tunnel
+# Install Cloudflare Tunnel (single binary, ~50MB)
 RUN curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 \
     -o /usr/local/bin/cloudflared && chmod +x /usr/local/bin/cloudflared
 
-# Install Tailscale
-RUN curl -fsSL https://tailscale.com/install.sh | sh
-
 WORKDIR /app
 
-# Copy application files (respects .dockerignore)
-COPY . .
+# Copy MoltiGuild configs (agents, skills, openclaw config)
+COPY agents/ ./agents/
+COPY skills/ ./skills/
+COPY openclaw.config.json ./
 
-# Install script dependencies
-RUN cd /app/scripts && npm install --production
+# Copy entrypoint
+COPY infra/entrypoint.sh ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh
 
-# Expose ports
-# 18789 - OpenClaw Gateway
-# 11434 - Ollama API
-# 3001  - Coordinator API
-EXPOSE 18789 11434 3001
+# openclaw-repo is mounted as a volume at runtime
+# node_modules is cached in a separate volume
 
-# Set entrypoint
-RUN chmod +x /app/infra/entrypoint.sh
-ENTRYPOINT ["/app/infra/entrypoint.sh"]
+EXPOSE 18789
+
+ENTRYPOINT ["./entrypoint.sh"]

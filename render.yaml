@@ -50,3 +50,9 @@ services:
         value: https://moltiguild-api.onrender.com
       - key: ADMIN_API_KEY
         sync: false
+
+  # ═══════════════════════════════════════
+  # Agent: Reviewer (Guild 0) — deploy manually as Web Service
+  # Agent: Creator (Guild 1)  — deploy manually as Web Service
+  # See README.md for env vars. Uses deploy/agent/Dockerfile
+  # ═══════════════════════════════════════
