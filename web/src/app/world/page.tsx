@@ -12,7 +12,7 @@ const UIOverlay = dynamic(() => import('@/components/UIOverlay'), {
 
 export default function WorldPage() {
   return (
-    <div style={{ width: '100%', height: '100vh', backgroundColor: 'var(--void)' }}>
+    <div style={{ width: '100%', height: '100vh', backgroundColor: '#2a3f5f' }}>
       <PhaserGame
         worldState={null}
         onGuildClick={(guildId) => {

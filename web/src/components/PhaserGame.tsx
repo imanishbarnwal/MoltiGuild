@@ -23,14 +23,13 @@ export default function PhaserGame({ worldState, onGuildClick, onEmptyLotClick, 
 
       const config: Phaser.Types.Core.GameConfig = {
         type: Phaser.AUTO,
-        width: 1280,
-        height: 720,
-        backgroundColor: '#1a1a2a',
+        width: window.innerWidth,
+        height: window.innerHeight,
+        backgroundColor: '#2a3f5f',
         parent: containerRef.current,
         pixelArt: true,
         scale: {
-          mode: Phaser.Scale.RESIZE,
-          autoCenter: Phaser.Scale.CENTER_BOTH,
+          mode: Phaser.Scale.NONE,
         },
         scene: [WorldScene],
       };

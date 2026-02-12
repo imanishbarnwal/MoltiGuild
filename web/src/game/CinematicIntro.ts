@@ -15,10 +15,10 @@ export const SKIP_INTRO = false;
  */
 export class CinematicIntro {
   /* ── Tuning constants ─────────────────────────────────────────── */
-  private static readonly OVERVIEW_ZOOM = 0.38;
-  private static readonly DRIFT_SPEED = 2;            // world-px per second
-  private static readonly LETTERBOX_PCT = 0.11;       // 11% screen height per bar
-  private static readonly OVERLAY_ALPHA = 0.35;
+  private static readonly OVERVIEW_ZOOM = 0.55;
+  private static readonly DRIFT_SPEED = 1.5;          // world-px per second
+  private static readonly LETTERBOX_PCT = 0.065;      // 6.5% screen height per bar
+  private static readonly OVERLAY_ALPHA = 0.2;
   private static readonly ZOOM_DURATION = 2800;       // ms
   private static readonly FADE_DURATION = 800;        // ms
   private static readonly BLUR_STRENGTH = 2;

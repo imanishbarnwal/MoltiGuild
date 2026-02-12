@@ -10,13 +10,13 @@ import { WorldState } from '@/lib/world-state';
 
 /* ── Tree spritesheet frame definitions (pixel rects from 288x160 sheet) ── */
 const TREE_FRAME_DEFS = [
-  { name: 'tree-large-a', x: 0,   y: 0,   w: 108, h: 160 },  // full left tree incl. trunk
-  { name: 'tree-large-b', x: 105, y: 0,   w: 108, h: 160 },  // full center tree incl. trunk
-  { name: 'tree-medium',  x: 205, y: 0,   w: 52,  h: 85  },  // medium round tree
-  { name: 'tree-conifer',  x: 258, y: 88,  w: 28,  h: 62  },  // small pine/conifer
-  { name: 'tree-dead',     x: 258, y: 25,  w: 28,  h: 62  },  // bare brown trunk
-  { name: 'bush-a',        x: 210, y: 82,  w: 34,  h: 34  },  // round green bush
-  { name: 'bush-b',        x: 244, y: 56,  w: 34,  h: 34  },  // yellow-green bush
+  { name: 'tree-large-a', x: 0, y: 0, w: 108, h: 160 },  // full left tree incl. trunk
+  { name: 'tree-large-b', x: 105, y: 0, w: 108, h: 160 },  // full center tree incl. trunk
+  { name: 'tree-medium', x: 205, y: 0, w: 52, h: 85 },  // medium round tree
+  { name: 'tree-conifer', x: 258, y: 88, w: 28, h: 62 },  // small pine/conifer
+  { name: 'tree-dead', x: 258, y: 25, w: 28, h: 62 },  // bare brown trunk
+  { name: 'bush-a', x: 210, y: 82, w: 34, h: 34 },  // round green bush
+  { name: 'bush-b', x: 244, y: 56, w: 34, h: 34 },  // yellow-green bush
 ];
 
 /* ── Tent + building sprite keys for random scattering ─────────────── */
@@ -36,10 +36,10 @@ const TENANT_KEYS = [
 
 /* ── All district regions for structure scattering ────────────────── */
 const DISTRICT_GRIDS = [
-  { gridX: 1,  gridY: 1,  width: 8, height: 8 },  // Creative Quarter
-  { gridX: 19, gridY: 1,  width: 8, height: 8 },  // Translation Ward
+  { gridX: 1, gridY: 1, width: 8, height: 8 },  // Creative Quarter
+  { gridX: 19, gridY: 1, width: 8, height: 8 },  // Translation Ward
   { gridX: 19, gridY: 19, width: 8, height: 8 },  // Code Heights
-  { gridX: 1,  gridY: 19, width: 8, height: 8 },  // DeFi Docks
+  { gridX: 1, gridY: 19, width: 8, height: 8 },  // DeFi Docks
   { gridX: 19, gridY: 10, width: 8, height: 8 },  // Research Fields
   { gridX: 10, gridY: 10, width: 8, height: 8 },  // Town Square
 ];
@@ -82,13 +82,13 @@ export class WorldScene extends Phaser.Scene {
 
     // Isometric Building Pack – all idle variants
     const bp = '/Isometric%20Building%20Pack';
-    this.load.image('bldg-barracks',      `${bp}/barracks/renders/idle/225/000.png`);
-    this.load.image('bldg-church',        `${bp}/church/renders/idle/225/000.png`);
-    this.load.image('bldg-firestation',   `${bp}/firestation/renders/idle/225/000.png`);
+    this.load.image('bldg-barracks', `${bp}/barracks/renders/idle/225/000.png`);
+    this.load.image('bldg-church', `${bp}/church/renders/idle/225/000.png`);
+    this.load.image('bldg-firestation', `${bp}/firestation/renders/idle/225/000.png`);
     this.load.image('bldg-herbary-empty', `${bp}/herbary/renders/idle_empty/225/000.png`);
-    this.load.image('bldg-herbary-full',  `${bp}/herbary/renders/idle_full/225/000.png`);
-    this.load.image('bldg-signal-fire',   `${bp}/signal_fire/renders/idle/225/000.png`);
-    this.load.image('bldg-weaponsmith',   `${bp}/weaponsmith/renders/idle/225/000.png`);
+    this.load.image('bldg-herbary-full', `${bp}/herbary/renders/idle_full/225/000.png`);
+    this.load.image('bldg-signal-fire', `${bp}/signal_fire/renders/idle/225/000.png`);
+    this.load.image('bldg-weaponsmith', `${bp}/weaponsmith/renders/idle/225/000.png`);
 
     // Grass tile texture (dark variant)
     this.load.image('grass-dark', '/grass/tilable-IMG_0044-dark.png');
@@ -332,17 +332,17 @@ export class WorldScene extends Phaser.Scene {
     const cam = this.cameras.main;
     if (!cam.postFX) return; // Canvas renderer — skip GPU effects
 
-    // Very subtle vignette — nearly invisible
-    cam.postFX.addVignette(0.5, 0.5, 0.92, 0.03);
+    // Extremely subtle vignette — barely visible for better initial visibility
+    cam.postFX.addVignette(0.5, 0.5, 0.95, 0.01);
 
-    // Very light warm tint — keep scene bright and vibrant
+    // Brighter scene with warm tint — improved visibility on load
     const colorMatrix = cam.postFX.addColorMatrix();
-    colorMatrix.brightness(1.05);
+    colorMatrix.brightness(1.15);
     // Minimal warm shift: keep greens vibrant
     const m = colorMatrix.getData();
-    m[0] += 0.03;   // R → R slight warmth
-    m[6] += 0.01;   // G → G tiny boost
-    m[12] -= 0.02;  // B → B slight reduction
+    m[0] += 0.05;   // R → R slight warmth
+    m[6] += 0.03;   // G → G tiny boost
+    m[12] -= 0.01;  // B → B slight reduction
     colorMatrix.set(m);
   }
 

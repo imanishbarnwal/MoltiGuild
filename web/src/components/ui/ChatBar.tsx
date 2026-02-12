@@ -35,8 +35,10 @@ export default function ChatBar({ expanded, onToggle }: ChatBarProps) {
           left: 0,
           right: 0,
           height: 40,
-          background: 'linear-gradient(90deg, var(--walnut), var(--walnut-light))',
-          borderTop: '2px solid var(--ember)',
+          background: 'linear-gradient(0deg, rgba(42, 63, 95, 0.95), rgba(42, 63, 95, 0.85))',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderTop: '1px solid rgba(196, 113, 59, 0.3)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -50,7 +52,7 @@ export default function ChatBar({ expanded, onToggle }: ChatBarProps) {
           e.currentTarget.style.borderTopColor = 'var(--ember-glow)';
         }}
         onMouseLeave={e => {
-          e.currentTarget.style.borderTopColor = 'var(--ember)';
+          e.currentTarget.style.borderTopColor = 'rgba(196, 113, 59, 0.3)';
         }}
       >
         <span
