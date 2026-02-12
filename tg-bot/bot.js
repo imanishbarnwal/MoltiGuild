@@ -15,7 +15,8 @@
  *   /missions      - Open missions
  *   /mission <id>  - Mission details
  *   /agents        - Online agents
- *   /create <guildId> <budget> <task>  - Create a mission
+ *   /ask <budget> <task>  - Auto-pick guild & create mission
+ *   /create <guildId> <budget> <task>  - Create a mission (manual guild)
  *   /pipeline <guildId> <budget> <role1,role2> <task>  - Multi-agent pipeline
  *   /rate <missionId> <score>  - Rate a mission (1-5)
  *   /balance <address>  - Check deposit balance
@@ -99,6 +100,7 @@ bot.command('help', async (ctx) => {
         `/agents \\- Online agents\n` +
         `/balance \\<address\\> \\- Deposit balance\n\n` +
         `*Write \\(admin\\):*\n` +
+        `/ask \\<budget\\> \\<task\\> \\- Auto\\-pick guild\n` +
         `/create \\<guildId\\> \\<budget\\> \\<task\\>\n` +
         `/pipeline \\<guildId\\> \\<budget\\> \\<roles\\> \\<task\\>\n` +
         `/rate \\<missionId\\> \\<score 1\\-5\\>\n\n` +
@@ -255,6 +257,40 @@ bot.command('balance', async (ctx) => {
 // ═══════════════════════════════════════
 // WRITE COMMANDS (admin key required)
 // ═══════════════════════════════════════
+
+bot.command('ask', async (ctx) => {
+    if (!ADMIN_KEY) return ctx.reply('Admin API key not configured.');
+
+    // /ask <budget> <task description>
+    const parts = ctx.match?.trim().split(/\s+/);
+    if (!parts || parts.length < 2) {
+        return ctx.reply('Usage: /ask <budgetMON> <task description>\nExample: /ask 0.005 Write a meme about Monad speed');
+    }
+
+    const budget = parts[0];
+    const task = parts.slice(1).join(' ');
+
+    try {
+        await ctx.reply(`Finding best guild for: "${task}"...`);
+        const result = await adminPost('/api/smart-create', { task, budget });
+
+        if (!result.ok) return ctx.reply(`Failed: ${result.error}`);
+
+        const d = result.data;
+        await ctx.reply(
+            `*Mission Created\\!*\n\n` +
+            `Guild: *${esc(d.guildName)}* \\(#${esc(d.guildId)}\\)\n` +
+            `Category: ${esc(d.matchedCategory)}\n` +
+            `Matched via: ${esc(d.matchConfidence)} \\(tier ${esc(d.matchTier)}\\)\n` +
+            `Mission ID: ${esc(d.missionId)}\n` +
+            `Budget: ${esc(budget)} MON\n` +
+            `TX: ${mono(d.txHash?.slice(0, 16) + '...')}`,
+            { parse_mode: 'MarkdownV2' },
+        );
+    } catch (err) {
+        await ctx.reply(`Error: ${err.message}`);
+    }
+});
 
 bot.command('create', async (ctx) => {
     if (!ADMIN_KEY) return ctx.reply('Admin API key not configured.');

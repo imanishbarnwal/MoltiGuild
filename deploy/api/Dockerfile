@@ -8,7 +8,7 @@ WORKDIR /app
 COPY scripts/package.json ./
 RUN npm install --production
 
-COPY scripts/api.js scripts/monad.js scripts/coordinator.js ./
+COPY scripts/api.js scripts/monad.js scripts/coordinator.js scripts/guild-matcher.js ./
 
 # Data directory for persistent state (heartbeats, pipelines)
 RUN mkdir -p /app/data

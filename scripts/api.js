@@ -24,6 +24,8 @@
  *   GET  /api/status           - Platform stats
  *   GET  /api/balance/:address - User deposit balance (v4)
  *   GET  /api/events           - SSE event stream (real-time updates)
+ *   POST /api/smart-create         - Auto-match guild & create mission (admin key)
+ *   POST /api/smart-pipeline       - Auto-match guild & create pipeline (admin key)
  *   POST /api/admin/create-mission - Create mission (admin key)
  *   POST /api/admin/rate-mission   - Rate mission (admin key)
  *   POST /api/admin/create-guild   - Create guild (admin key)
@@ -34,6 +36,7 @@ const fs = require('fs');
 const path = require('path');
 const { verifyMessage } = require('viem');
 const monad = require('./monad');
+const { matchGuildForTask } = require('./guild-matcher');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
 const app = express();
@@ -538,6 +541,124 @@ app.post('/api/admin/create-guild', requireAdmin, async (req, res) => {
 });
 
 // ═══════════════════════════════════════
+// SMART GUILD MATCHING (fallback when OpenClaw is down)
+// ═══════════════════════════════════════
+
+// POST /api/smart-create - Auto-match guild & create mission
+app.post('/api/smart-create', requireAdmin, async (req, res) => {
+    try {
+        const { task, budget } = req.body;
+        if (!task) return res.status(400).json({ ok: false, error: 'Missing task description' });
+        if (!budget) return res.status(400).json({ ok: false, error: 'Missing budget (in MON, e.g. "0.005")' });
+
+        const guilds = await getEnrichedGuilds();
+        const match = await matchGuildForTask(task, guilds);
+
+        if (!match.guild) {
+            return res.status(404).json({ ok: false, error: 'No guilds available for matching' });
+        }
+
+        const guildId = parseInt(match.guild.guildId);
+        const taskHash = monad.hashTask(task);
+        const budgetWei = monad.parseEther(budget);
+        const txResult = await monad.createMission(guildId, taskHash, budgetWei);
+        const missionCount = Number(await monad.readContract('getMissionCount'));
+        const missionId = missionCount - 1;
+
+        broadcast('mission_created', { missionId, guildId, task, budget });
+        res.json({
+            ok: true,
+            data: {
+                missionId,
+                guildId,
+                guildName: match.guild.name,
+                matchedCategory: match.category,
+                matchTier: match.tier,
+                matchConfidence: match.confidence,
+                task,
+                taskHash,
+                budget: `${budget} MON`,
+                ...txResult,
+            },
+        });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// POST /api/smart-pipeline - Auto-match guild & create pipeline
+app.post('/api/smart-pipeline', requireAdmin, async (req, res) => {
+    try {
+        const { task, budget, steps } = req.body;
+        if (!task) return res.status(400).json({ ok: false, error: 'Missing task description' });
+        if (!budget) return res.status(400).json({ ok: false, error: 'Missing budget' });
+        if (!steps || !Array.isArray(steps) || steps.length < 2) {
+            return res.status(400).json({ ok: false, error: 'Need at least 2 steps' });
+        }
+
+        const guilds = await getEnrichedGuilds();
+        const match = await matchGuildForTask(task, guilds);
+
+        if (!match.guild) {
+            return res.status(404).json({ ok: false, error: 'No guilds available for matching' });
+        }
+
+        const gid = parseInt(match.guild.guildId);
+        const counter = await incPipelineCounter();
+        const pipelineId = `pipeline-${counter}`;
+        const budgetWei = monad.parseEther(budget);
+        const taskHash = monad.hashTask(task);
+
+        const txResult = await monad.createMission(gid, taskHash, budgetWei);
+        const missionCount = Number(await monad.readContract('getMissionCount'));
+        const missionId = missionCount - 1;
+
+        const pipelines = await getPipelines();
+        pipelines[pipelineId] = {
+            id: pipelineId,
+            missionId,
+            guildId: gid,
+            task,
+            budget,
+            steps: steps.map((s, i) => ({
+                step: i + 1,
+                role: s.role || `Step ${i + 1}`,
+                status: i === 0 ? 'awaiting_claim' : 'pending',
+                agent: null,
+                result: null,
+            })),
+            currentStep: 1,
+            totalSteps: steps.length,
+            status: 'active',
+            contributors: [],
+            createdAt: new Date().toISOString(),
+        };
+        await savePipelines(pipelines);
+
+        broadcast('pipeline_created', { pipelineId, missionId, guildId: gid, task, totalSteps: steps.length, budget });
+        res.json({
+            ok: true,
+            data: {
+                pipelineId,
+                missionId,
+                guildId: gid,
+                guildName: match.guild.name,
+                matchedCategory: match.category,
+                matchTier: match.tier,
+                matchConfidence: match.confidence,
+                totalSteps: steps.length,
+                currentStep: 1,
+                currentRole: steps[0].role,
+                budget: `${budget} MON`,
+                ...txResult,
+            },
+        });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// ═══════════════════════════════════════
 // GET ENDPOINTS (public)
 // ═══════════════════════════════════════
 
@@ -716,34 +837,37 @@ app.get('/api/agents/online', async (req, res) => {
     }
 });
 
+// Shared helper: fetch guilds + enrich with memberCount
+async function getEnrichedGuilds(category) {
+    let guilds;
+    if (category) {
+        guilds = await monad.getGuildsByCategory(category);
+    } else {
+        guilds = await monad.getGuildLeaderboard();
+    }
+
+    return Promise.all(guilds.map(async (g) => {
+        let memberCount = 0;
+        try {
+            const members = await monad.getGuildAgents(parseInt(g.guildId));
+            memberCount = members.length;
+        } catch {}
+
+        return {
+            guildId: g.guildId,
+            name: g.name,
+            category: g.category,
+            avgRating: g.avgRating,
+            totalMissions: g.totalMissions,
+            memberCount,
+        };
+    }));
+}
+
 // GET /api/guilds
 app.get('/api/guilds', async (req, res) => {
     try {
-        const { category } = req.query;
-        let guilds;
-        if (category) {
-            guilds = await monad.getGuildsByCategory(category);
-        } else {
-            guilds = await monad.getGuildLeaderboard();
-        }
-
-        const enriched = await Promise.all(guilds.map(async (g) => {
-            let memberCount = 0;
-            try {
-                const members = await monad.getGuildAgents(parseInt(g.guildId));
-                memberCount = members.length;
-            } catch {}
-
-            return {
-                guildId: g.guildId,
-                name: g.name,
-                category: g.category,
-                avgRating: g.avgRating,
-                totalMissions: g.totalMissions,
-                memberCount,
-            };
-        }));
-
+        const enriched = await getEnrichedGuilds(req.query.category);
         res.json({ ok: true, data: { count: enriched.length, guilds: enriched } });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
@@ -817,5 +941,6 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`  GET  /api/status, /api/missions/open, /api/agents/online`);
     console.log(`  GET  /api/guilds, /api/guilds/:id/agents, /api/balance/:addr`);
     console.log(`  GET  /api/events (SSE stream)`);
+    console.log(`  POST /api/smart-create, /api/smart-pipeline (auto guild matching)`);
     console.log(`  POST /api/admin/* (admin key: ${ADMIN_API_KEY ? 'configured' : 'NOT SET'})`);
 });
