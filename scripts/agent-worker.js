@@ -99,6 +99,33 @@ const PROMPTS = {
     'content-creation': 'You are a web3 content creator specializing in Monad blockchain. A client submitted a creative task to your guild. Write an engaging, informative piece about Monad\'s parallel execution, speed, or ecosystem. Make it suitable for a blog or social media thread. Keep it under 400 words.',
 };
 
+async function callGemini(prompt) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
+    const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_KEY}`,
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { temperature: 0.7, maxOutputTokens: 600 },
+            }),
+            signal: controller.signal,
+        },
+    );
+
+    clearTimeout(timeout);
+    if (res.status === 429) throw { retry: true, msg: 'rate limited' };
+    if (!res.ok) throw { retry: false, msg: `Gemini ${res.status}` };
+
+    const json = await res.json();
+    const text = json.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    if (text) return text;
+    throw { retry: false, msg: 'Empty Gemini response' };
+}
+
 async function doWork() {
     const prompt = PROMPTS[CAPABILITY] || `You are an AI agent with capability: ${CAPABILITY}. Complete a task for a blockchain guild. Write a professional result. Keep it under 400 words.`;
 
@@ -106,33 +133,19 @@ async function doWork() {
         return `[${CAPABILITY}] Task completed by agent ${account.address.slice(0, 10)}... Generic result — no LLM key configured.`;
     }
 
-    try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 15000);
-
-        const res = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_KEY}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: { temperature: 0.7, maxOutputTokens: 600 },
-                }),
-                signal: controller.signal,
-            },
-        );
-
-        clearTimeout(timeout);
-        if (!res.ok) throw new Error(`Gemini ${res.status}`);
-
-        const json = await res.json();
-        const text = json.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-        if (text) return text;
-        throw new Error('Empty Gemini response');
-    } catch (err) {
-        log(`LLM error: ${err.message}, using fallback`);
-        return `[${CAPABILITY}] Task completed by agent ${account.address.slice(0, 10)}. Automated review — LLM temporarily unavailable.`;
+    const delays = [0, 10000, 30000]; // immediate, 10s, 30s
+    for (let i = 0; i < delays.length; i++) {
+        if (delays[i]) {
+            log(`Rate limited, retrying in ${delays[i] / 1000}s... (${i}/${delays.length - 1})`);
+            await new Promise(r => setTimeout(r, delays[i]));
+        }
+        try {
+            return await callGemini(prompt);
+        } catch (err) {
+            if (err.retry && i < delays.length - 1) continue;
+            log(`LLM error: ${err.msg || err.message}, using fallback`);
+            return `[${CAPABILITY}] Task completed by agent ${account.address.slice(0, 10)}. Automated review — LLM temporarily unavailable.`;
+        }
     }
 }
 
