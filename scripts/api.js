@@ -563,9 +563,19 @@ app.post('/api/submit-result', requireAuth('submit-result'), async (req, res) =>
 
         const txResult = await monad.completeMission(mid, [resultHash], [claimer], [agentSplit]);
 
+        // Store result for retrieval
+        if (redis) {
+            await redis.set(`result:${mid}`, JSON.stringify({ missionId: mid, agent: claimer, result: resultData, completedAt: new Date().toISOString() }));
+        } else {
+            const results = loadJSONFile('results.json');
+            results[mid] = { missionId: mid, agent: claimer, result: resultData, completedAt: new Date().toISOString() };
+            saveJSONFile('results.json', results);
+        }
+
         broadcast('mission_completed', {
             missionId: mid, agent: claimer,
             paid: monad.formatEther(agentSplit) + ' MON',
+            result: resultData,
             ...txResult,
         });
         res.json({
@@ -1035,6 +1045,27 @@ app.get('/api/status', async (req, res) => {
             .filter(h => Date.now() - h.lastSeen < 15 * 60 * 1000).length;
 
         res.json({ ok: true, data: { ...stats, onlineAgents: onlineCount } });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// GET /api/mission/:id/result - Get completed mission result
+app.get('/api/mission/:id/result', async (req, res) => {
+    try {
+        const mid = req.params.id;
+        let stored = null;
+        if (redis) {
+            const raw = await redis.get(`result:${mid}`);
+            if (raw) stored = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        } else {
+            const results = loadJSONFile('results.json');
+            stored = results[mid] || null;
+        }
+        if (!stored) {
+            return res.status(404).json({ ok: false, error: 'Result not found. Mission may still be in progress.' });
+        }
+        res.json({ ok: true, data: stored });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
     }

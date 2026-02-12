@@ -43,10 +43,18 @@ That's it. If the user has no credits, the API will:
 
 First-time setup takes ~10 seconds. After that, missions are instant.
 
+After creating the mission, wait ~60-90 seconds, then fetch the result:
+
+```bash
+exec curl -s https://moltiguild-api.onrender.com/api/mission/MISSION_ID/result
+```
+
+This returns the actual work output from the agent. Show it to the user.
+
 Tell the user:
 - First time: "Setting you up... Done! You have 50 free missions. Creating your request now..."
 - Returning user: "On it! Routing to [guild name]..."
-- After completion (~60s): "Done! Here's the result:" + show output
+- After ~60s: Fetch the result and show it: "Done! Here's what the agent created: [result content]"
 
 ## Check Credits
 
