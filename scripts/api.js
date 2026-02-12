@@ -134,6 +134,40 @@ async function incPipelineCounter() {
 
 let pipelineCounter = 0;
 
+// ═══════════════════════════════════════
+// USER CREDITS (pay-per-mission)
+// ═══════════════════════════════════════
+
+const COORDINATOR_ADDRESS = process.env.COORDINATOR_ADDRESS || '0xf7D8E04f82d343B68a7545FF632e282B502800Fd';
+
+async function getCredits(userId) {
+    if (redis) return parseFloat((await redis.get(`credits:${userId}`)) || '0');
+    const credits = loadJSONFile('credits.json');
+    return parseFloat(credits[userId] || '0');
+}
+
+async function setCredits(userId, amount) {
+    if (redis) return await redis.set(`credits:${userId}`, String(amount));
+    const credits = loadJSONFile('credits.json');
+    credits[userId] = String(amount);
+    saveJSONFile('credits.json', credits);
+}
+
+async function getUsedTxHashes() {
+    if (redis) return (await redis.get('used_tx_hashes')) || [];
+    return loadJSONFile('used_tx_hashes.json', []);
+}
+
+async function addUsedTxHash(hash) {
+    if (redis) {
+        const used = (await redis.get('used_tx_hashes')) || [];
+        used.push(hash);
+        return await redis.set('used_tx_hashes', used);
+    }
+    const used = loadJSONFile('used_tx_hashes.json', []);
+    used.push(hash);
+    saveJSONFile('used_tx_hashes.json', used);
+}
 
 // ═══════════════════════════════════════
 // SIGNATURE VERIFICATION
@@ -541,15 +575,113 @@ app.post('/api/admin/create-guild', requireAdmin, async (req, res) => {
 });
 
 // ═══════════════════════════════════════
-// SMART GUILD MATCHING (fallback when OpenClaw is down)
+// USER CREDITS ENDPOINTS
+// ═══════════════════════════════════════
+
+// GET /api/credits/:userId - Check user's credit balance
+app.get('/api/credits/:userId', async (req, res) => {
+    try {
+        const credits = await getCredits(req.params.userId);
+        res.json({ ok: true, data: { userId: req.params.userId, credits: `${credits} MON`, raw: credits } });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// POST /api/verify-payment - Verify MON transfer to coordinator, credit user
+app.post('/api/verify-payment', async (req, res) => {
+    try {
+        const { txHash, userId } = req.body;
+        if (!txHash || !userId) return res.status(400).json({ ok: false, error: 'Missing txHash or userId' });
+
+        // Check if tx already used
+        const usedHashes = await getUsedTxHashes();
+        if (usedHashes.includes(txHash.toLowerCase())) {
+            return res.status(400).json({ ok: false, error: 'This transaction has already been credited' });
+        }
+
+        // Verify on-chain
+        const publicClient = monad.getPublicClient();
+        const tx = await publicClient.getTransaction({ hash: txHash });
+
+        if (!tx) return res.status(404).json({ ok: false, error: 'Transaction not found' });
+        if (tx.to?.toLowerCase() !== COORDINATOR_ADDRESS.toLowerCase()) {
+            return res.status(400).json({ ok: false, error: 'Transaction was not sent to the coordinator address' });
+        }
+
+        const receipt = await publicClient.getTransactionReceipt({ hash: txHash });
+        if (receipt.status !== 'success') {
+            return res.status(400).json({ ok: false, error: 'Transaction failed on-chain' });
+        }
+
+        const amountMON = parseFloat(monad.formatEther(tx.value));
+        if (amountMON <= 0) {
+            return res.status(400).json({ ok: false, error: 'Transaction has no MON value' });
+        }
+
+        // Credit user
+        const currentCredits = await getCredits(userId);
+        const newCredits = currentCredits + amountMON;
+        await setCredits(userId, newCredits);
+        await addUsedTxHash(txHash.toLowerCase());
+
+        res.json({
+            ok: true,
+            data: {
+                userId,
+                credited: `${amountMON} MON`,
+                totalCredits: `${newCredits} MON`,
+                txHash,
+            },
+        });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// POST /api/admin/add-credits - Admin manually adds credits (for testing/promos)
+app.post('/api/admin/add-credits', requireAdmin, async (req, res) => {
+    try {
+        const { userId, amount } = req.body;
+        if (!userId || !amount) return res.status(400).json({ ok: false, error: 'Missing userId or amount' });
+        const currentCredits = await getCredits(userId);
+        const newCredits = currentCredits + parseFloat(amount);
+        await setCredits(userId, newCredits);
+        res.json({ ok: true, data: { userId, credited: `${amount} MON`, totalCredits: `${newCredits} MON` } });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// ═══════════════════════════════════════
+// SMART GUILD MATCHING
 // ═══════════════════════════════════════
 
 // POST /api/smart-create - Auto-match guild & create mission
-app.post('/api/smart-create', requireAdmin, async (req, res) => {
+// Requires either admin key OR userId with sufficient credits
+app.post('/api/smart-create', async (req, res) => {
     try {
-        const { task, budget } = req.body;
+        const { task, budget, userId } = req.body;
         if (!task) return res.status(400).json({ ok: false, error: 'Missing task description' });
-        if (!budget) return res.status(400).json({ ok: false, error: 'Missing budget (in MON, e.g. "0.005")' });
+
+        const missionBudget = budget || '0.001';
+
+        // Auth: admin key bypasses credits, otherwise check user credits
+        const adminKey = req.headers['x-admin-key'];
+        const isAdmin = adminKey && adminKey === ADMIN_API_KEY;
+
+        if (!isAdmin) {
+            if (!userId) return res.status(401).json({ ok: false, error: 'Missing X-Admin-Key or userId' });
+            const credits = await getCredits(userId);
+            if (credits < parseFloat(missionBudget)) {
+                return res.status(402).json({
+                    ok: false,
+                    error: `Insufficient credits. Need ${missionBudget} MON, have ${credits} MON. Send MON to ${COORDINATOR_ADDRESS} and verify with /api/verify-payment`,
+                });
+            }
+            // Deduct credits
+            await setCredits(userId, credits - parseFloat(missionBudget));
+        }
 
         const guilds = await getEnrichedGuilds();
         const match = await matchGuildForTask(task, guilds);
@@ -560,12 +692,12 @@ app.post('/api/smart-create', requireAdmin, async (req, res) => {
 
         const guildId = parseInt(match.guild.guildId);
         const taskHash = monad.hashTask(task);
-        const budgetWei = monad.parseEther(budget);
+        const budgetWei = monad.parseEther(missionBudget);
         const txResult = await monad.createMission(guildId, taskHash, budgetWei);
         const missionCount = Number(await monad.readContract('getMissionCount'));
         const missionId = missionCount - 1;
 
-        broadcast('mission_created', { missionId, guildId, task, budget });
+        broadcast('mission_created', { missionId, guildId, task, budget: missionBudget });
         res.json({
             ok: true,
             data: {
@@ -577,7 +709,8 @@ app.post('/api/smart-create', requireAdmin, async (req, res) => {
                 matchConfidence: match.confidence,
                 task,
                 taskHash,
-                budget: `${budget} MON`,
+                budget: `${missionBudget} MON`,
+                userId: userId || 'admin',
                 ...txResult,
             },
         });
