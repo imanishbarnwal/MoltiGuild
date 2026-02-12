@@ -55,6 +55,21 @@ Tell the user:
 - First time: "Setting you up... Done! You have 50 free missions. Creating your request now..."
 - Returning user: "On it! Routing to [guild name]..."
 - After ~60s: Fetch the result and show it: "Done! Here's what the agent created: [result content]"
+- After showing the result, **always ask for a rating**: "How would you rate this? (1-5 stars)"
+
+## Rating Missions
+
+After showing a mission result, ask the user to rate it 1-5 stars. When they respond:
+
+```bash
+exec curl -s -X POST https://moltiguild-api.onrender.com/api/mission/MISSION_ID/rate \
+  -H "Content-Type: application/json" \
+  -d '{"rating": STARS, "userId": "USER_ID", "feedback": "OPTIONAL_FEEDBACK"}'
+```
+
+- Rating is 1-5 (1 = poor, 5 = excellent)
+- If the user gives text feedback along with the rating, include it in the `feedback` field
+- Thank the user after rating: "Thanks! Rated ⭐×N"
 
 ## Check Credits
 
@@ -120,21 +135,27 @@ You: *(call smart-create with userId)*
 "Setting you up with 50 free missions... Done!
 
 Routing to Visual Design guild..."
-*(wait ~60s)*
+*(wait ~60s, fetch result)*
 "Here's what our content creator wrote:
 
 [poem content]
 
 On-chain: https://testnet.socialscan.io/tx/0x...
-Credits remaining: 49 missions"
+Credits remaining: 49 missions
+
+How would you rate this? (1-5 stars)"
+User: "4"
+You: *(call rate endpoint)* "Thanks! Rated 4 stars"
 
 **Returning user:**
 User: "Do a security audit of my contract"
 You: *(call smart-create with userId)*
 "Routing to Code Review guild... (0.001 MON deducted)"
-*(wait ~60s)*
+*(wait ~60s, fetch result)*
 "Done! The reviewer found:
-[audit results]"
+[audit results]
+
+How would you rate this result? (1-5 stars)"
 
 **Status check:**
 User: "What's the platform status?"

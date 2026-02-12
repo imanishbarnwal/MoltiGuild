@@ -26,6 +26,10 @@
  *   GET  /api/events           - SSE event stream (real-time updates)
  *   POST /api/smart-create         - Auto-match guild & create mission (admin key)
  *   POST /api/smart-pipeline       - Auto-match guild & create pipeline (admin key)
+ *   GET  /health                    - Lightweight health check
+ *   GET  /api/mission/:id/result   - Get completed mission result
+ *   POST /api/mission/:id/rate     - Rate a mission (1-5 stars)
+ *   GET  /api/mission/:id/rating   - Get mission rating
  *   POST /api/admin/create-mission - Create mission (admin key)
  *   POST /api/admin/rate-mission   - Rate mission (admin key)
  *   POST /api/admin/create-guild   - Create guild (admin key)
@@ -41,6 +45,9 @@ require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
 const app = express();
 app.use(express.json());
+
+// Health check — lightweight, for uptime monitors
+app.get('/health', (req, res) => res.json({ ok: true, uptime: Math.floor(process.uptime()) }));
 
 // CORS - allow web dashboards and bots to call the API
 app.use((req, res, next) => {
@@ -1064,6 +1071,63 @@ app.get('/api/mission/:id/result', async (req, res) => {
         }
         if (!stored) {
             return res.status(404).json({ ok: false, error: 'Result not found. Mission may still be in progress.' });
+        }
+        res.json({ ok: true, data: stored });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// POST /api/mission/:id/rate - Rate a completed mission (1-5 stars)
+app.post('/api/mission/:id/rate', async (req, res) => {
+    try {
+        const mid = req.params.id;
+        const { rating, userId, feedback } = req.body;
+
+        if (!rating || !userId) {
+            return res.status(400).json({ ok: false, error: 'rating (1-5) and userId required' });
+        }
+
+        const stars = parseInt(rating);
+        if (stars < 1 || stars > 5) {
+            return res.status(400).json({ ok: false, error: 'rating must be 1-5' });
+        }
+
+        const ratingData = { missionId: mid, userId, rating: stars, feedback: feedback || null, ratedAt: new Date().toISOString() };
+
+        if (redis) {
+            await redis.set(`rating:${mid}`, JSON.stringify(ratingData));
+            // Track per-user ratings list
+            const userRatings = JSON.parse(await redis.get(`user_ratings:${userId}`) || '[]');
+            userRatings.push({ missionId: mid, rating: stars });
+            await redis.set(`user_ratings:${userId}`, JSON.stringify(userRatings));
+        } else {
+            const ratings = loadJSONFile('ratings.json');
+            ratings[mid] = ratingData;
+            saveJSONFile('ratings.json', ratings);
+        }
+
+        broadcast('mission_rated', ratingData);
+        res.json({ ok: true, data: ratingData });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// GET /api/mission/:id/rating - Get rating for a mission
+app.get('/api/mission/:id/rating', async (req, res) => {
+    try {
+        const mid = req.params.id;
+        let stored = null;
+        if (redis) {
+            const raw = await redis.get(`rating:${mid}`);
+            if (raw) stored = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        } else {
+            const ratings = loadJSONFile('ratings.json');
+            stored = ratings[mid] || null;
+        }
+        if (!stored) {
+            return res.status(404).json({ ok: false, error: 'No rating found for this mission' });
         }
         res.json({ ok: true, data: stored });
     } catch (err) {
