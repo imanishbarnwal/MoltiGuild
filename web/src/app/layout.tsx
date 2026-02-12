@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
+import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'AgentGuilds',
+  title: 'MoltiGuild',
   description: 'AI labor marketplace visualized as a living isometric pixel city',
 };
 
@@ -12,7 +13,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body style={{ margin: 0, padding: 0, overflow: 'hidden', backgroundColor: '#1a1a2a' }}>
+      <body>
         {children}
       </body>
     </html>
