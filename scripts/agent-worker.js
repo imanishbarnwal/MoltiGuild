@@ -126,8 +126,20 @@ async function callGemini(prompt) {
     throw { retry: false, msg: 'Empty Gemini response' };
 }
 
-async function doWork() {
-    const prompt = PROMPTS[CAPABILITY] || `You are an AI agent with capability: ${CAPABILITY}. Complete a task for a blockchain guild. Write a professional result. Keep it under 400 words.`;
+async function doWork(context) {
+    const basePrompt = PROMPTS[CAPABILITY] || `You are an AI agent with capability: ${CAPABILITY}. Complete a task for a blockchain guild. Write a professional result. Keep it under 400 words.`;
+
+    let prompt = basePrompt;
+
+    // If this is a pipeline step, add context from previous steps
+    if (context) {
+        const parts = [basePrompt];
+        if (context.task) parts.push(`\nThe client's original request: "${context.task}"`);
+        if (context.role) parts.push(`Your role in this pipeline: ${context.role}`);
+        if (context.step && context.totalSteps) parts.push(`This is step ${context.step} of ${context.totalSteps}.`);
+        if (context.previousResult) parts.push(`\nPrevious agent's output (build on this):\n---\n${context.previousResult}\n---`);
+        prompt = parts.join('\n');
+    }
 
     if (!GEMINI_KEY) {
         return `[${CAPABILITY}] Task completed by agent ${account.address.slice(0, 10)}... Generic result — no LLM key configured.`;
@@ -212,11 +224,113 @@ async function heartbeat() {
     } catch (e) { log(`Heartbeat error: ${e.message}`); }
 }
 
+// ── ROLE MATCHING ────────────────────────
+// Maps capability keywords to roles an agent can handle
+
+const ROLE_MAP = {
+    'code-review': ['code-review', 'review', 'audit', 'security', 'reviewer', 'test'],
+    'content-creation': ['content-creation', 'content', 'creative', 'writer', 'design', 'meme', 'writing'],
+};
+
+function canHandleRole(role) {
+    if (!role) return true; // No role specified = anyone can grab it
+    const myRoles = ROLE_MAP[CAPABILITY] || [CAPABILITY];
+    const normalized = role.toLowerCase();
+    return myRoles.some(r => normalized.includes(r));
+}
+
 // ── MISSION LOOP ─────────────────────────
 
 let working = false;
 
+async function pollPipelines() {
+    if (working) return;
+
+    try {
+        // Check for pipeline steps awaiting claim in our guild
+        const data = await apiGet(`missions/next?guildId=${GUILD_ID}`);
+        if (!data.ok || !data.data.missions.length) return;
+
+        for (const step of data.data.missions) {
+            // Only pick up steps matching our capability
+            if (!canHandleRole(step.role)) {
+                log(`Skipping pipeline step "${step.role}" (not my role: ${CAPABILITY})`);
+                continue;
+            }
+
+            const mid = parseInt(step.missionId);
+
+            // Check if already claimed on-chain
+            const claimer = await readContract('missionClaims', [BigInt(mid)]);
+            if (claimer !== ZERO_ADDR && claimer !== account.address) continue;
+
+            working = true;
+            log(`Pipeline ${step.pipelineId} — claiming step ${step.step}/${step.totalSteps} (role: ${step.role})`);
+
+            // Claim on-chain if not already claimed by us
+            if (claimer === ZERO_ADDR) {
+                try {
+                    const tx = await writeContract('claimMission', [BigInt(mid)]);
+                    log(`Claimed mission #${mid} (block ${tx.block})`);
+                } catch (e) {
+                    log(`Claim failed for pipeline #${mid}: ${e.message}`);
+                    working = false;
+                    continue;
+                }
+            }
+
+            // Get full pipeline context (previous steps' output)
+            let context = { task: step.task, role: step.role, step: step.step, totalSteps: step.totalSteps };
+            try {
+                const ctxData = await apiGet(`mission-context/${mid}`);
+                if (ctxData.ok && ctxData.data) {
+                    const prev = ctxData.data.previousSteps;
+                    if (prev && prev.length > 0) {
+                        context.previousResult = prev[prev.length - 1].result || prev[prev.length - 1].resultHash;
+                    }
+                }
+            } catch (e) {
+                log(`Context fetch failed: ${e.message}`);
+            }
+
+            // Do the work with context
+            log(`Working on pipeline step (role: ${step.role})...`);
+            const result = await doWork(context);
+            log(`Work done (${result.length} chars)`);
+
+            // Submit result
+            const submitResult = await signedPost('submit-result', {
+                missionId: String(mid),
+                resultData: result,
+            });
+
+            if (submitResult.ok) {
+                missionsCompleted++;
+                const pipelineInfo = submitResult.data.pipeline;
+                if (pipelineInfo) {
+                    log(`Pipeline step done! ${pipelineInfo.currentStep}/${pipelineInfo.totalSteps} complete`);
+                } else {
+                    log(`Mission #${mid} completed! Paid: ${submitResult.data.agentPaid}`);
+                }
+                if (submitResult.data.txHash) log(`  tx: ${submitResult.data.txHash}`);
+            } else {
+                log(`Submit failed for pipeline #${mid}: ${submitResult.error}`);
+            }
+
+            working = false;
+            break;
+        }
+    } catch (e) {
+        log(`Pipeline poll error: ${e.message}`);
+        working = false;
+    }
+}
+
 async function pollMissions() {
+    if (working) return;
+
+    // Check pipelines first (they have steps waiting)
+    await pollPipelines();
     if (working) return;
 
     try {
