@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
-import { TilemapManager, GRID_SIZE } from './TilemapManager';
+import { TilemapManager, GRID_COLS, GRID_ROWS } from './TilemapManager';
+import { seededRng, ValueNoise2D } from './noise';
 
 /* ── Frame definitions for tree textures extracted from spritesheet ── */
 interface TreeFrame {
@@ -18,58 +19,37 @@ const TREE_FRAMES: TreeFrame[] = [
   { name: 'bush-b',        category: 'bush',    weight: 4 },
 ];
 
-/* Green tint variations for trees */
+/* Default green tint variations for non-biome trees */
 const TREE_TINTS = [0xffffff, 0xe8ffe8, 0xd8f0d8, 0xf0ffe0];
 
-/* ── Seeded PRNG (mulberry32) ──────────────────────────────────────── */
-function seededRng(seed: number) {
-  return () => {
-    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
-    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
-    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-    return ((t ^ t >>> 14) >>> 0) / 4294967296;
-  };
-}
+/* Per-biome tree tint palettes */
+const BIOME_TREE_TINTS: Record<string, number[]> = {
+  creative:    [0xe0ffe0, 0xffd8e8, 0xd8ffd8, 0xf8e8f0],  // greens + pinks
+  townsquare:  [0xf0e8d0, 0xe8dcc8, 0xffffff, 0xf0ead8],  // warm neutrals
+  translation: [0xd0f0d0, 0xc8e8c0, 0xe0ffd0, 0xd8f0c8],  // tropical greens
+  defi:        [0xc8a878, 0xb89868, 0xa08058, 0xd0b080],   // burnt browns
+  research:    [0xd0c8e8, 0xc0d8e0, 0xb8b0d8, 0xd0e0e8],  // purple/teal tints
+  code:        [0xe0e8f0, 0xd0d8e8, 0xf0f0f8, 0xd8e0e8],  // frosty whites
+};
 
-/* ── 2D Value Noise ────────────────────────────────────────────────── */
-class ValueNoise2D {
-  private grid: number[][];
-  private size: number;
+/* Per-biome tree type weight overrides (category → weight multiplier) */
+const BIOME_TREE_WEIGHTS: Record<string, Record<string, number>> = {
+  creative:    { bush: 2, medium: 2, dead: 0 },
+  defi:        { dead: 3, bush: 0.5, large: 0.5 },
+  code:        { conifer: 3, dead: 1.5, bush: 0.5 },
+  research:    { bush: 2, medium: 1.5, dead: 0 },
+  translation: { medium: 2, bush: 2 },
+  townsquare:  { bush: 3, medium: 1, large: 0.3, dead: 0 },
+};
 
-  constructor(size: number, seed: number) {
-    this.size = size;
-    const rand = seededRng(seed);
-    this.grid = [];
-    for (let y = 0; y <= size; y++) {
-      this.grid[y] = [];
-      for (let x = 0; x <= size; x++) {
-        this.grid[y][x] = rand();
-      }
-    }
-  }
-
-  sample(x: number, y: number): number {
-    const xi = Math.max(0, Math.min(Math.floor(x), this.size - 1));
-    const yi = Math.max(0, Math.min(Math.floor(y), this.size - 1));
-    const xf = x - Math.floor(x);
-    const yf = y - Math.floor(y);
-
-    const x1 = Math.min(xi + 1, this.size);
-    const y1 = Math.min(yi + 1, this.size);
-
-    const sx = xf * xf * (3 - 2 * xf);
-    const sy = yf * yf * (3 - 2 * yf);
-
-    const top = this.grid[yi][xi] * (1 - sx) + this.grid[yi][x1] * sx;
-    const bot = this.grid[y1][xi] * (1 - sx) + this.grid[y1][x1] * sx;
-    return top * (1 - sy) + bot * sy;
-  }
-}
+/* seededRng and ValueNoise2D imported from noise.ts */
 
 /* ── TreeManager ───────────────────────────────────────────────────── */
 export class TreeManager {
   private sprites: Phaser.GameObjects.Image[] = [];
   private shadows: Phaser.GameObjects.Image[] = [];
+  /** Map "col,row" → index into sprites/shadows arrays for clearing. */
+  private tileIndex: Map<string, number[]> = new Map();
 
   private static readonly NOISE_SEED = 1337;
   private static readonly NOISE_GRID = 6;
@@ -99,19 +79,19 @@ export class TreeManager {
       for (let i = 0; i < f.weight; i++) weighted.push(f);
     }
 
-    // Pass 1: collect all eligible grass tiles and score them
-    const candidates: { col: number; row: number; score: number }[] = [];
-    let totalGrass = 0;
+    // Pass 1: collect all eligible tiles and score them (districts + edges)
+    const candidates: { col: number; row: number; score: number; biome: string | undefined }[] = [];
+    let totalEligible = 0;
 
-    for (let row = 0; row < GRID_SIZE; row++) {
-      for (let col = 0; col < GRID_SIZE; col++) {
+    for (let row = 0; row < GRID_ROWS; row++) {
+      for (let col = 0; col < GRID_COLS; col++) {
+        // Skip tiles outside the organic world boundary
+        if (!this.tilemapManager.isInWorld(col, row)) continue;
+
         // Skip road tiles
         if (this.tilemapManager.isRoad(col, row)) continue;
 
-        // Skip district tiles themselves
-        if (this.tilemapManager.getTileDistrict(col, row)) continue;
-
-        totalGrass++;
+        totalEligible++;
 
         // Skip tiles too close to buildings (4-tile radius)
         const nearBuilding = this.buildingPositions.some(
@@ -123,18 +103,21 @@ export class TreeManager {
         if (this.isNearDistrict(col, row, DISTRICT_CLEARANCE)) continue;
 
         // Sample two noise octaves for organic clustering
-        const nx = (col / GRID_SIZE) * NOISE_GRID;
-        const ny = (row / GRID_SIZE) * NOISE_GRID;
+        const nx = (col / GRID_COLS) * NOISE_GRID;
+        const ny = (row / GRID_ROWS) * NOISE_GRID;
         const n1 = noise.sample(nx, ny);
         const n2 = noise2.sample(nx * 1.5, ny * 1.5);
         let score = n1 * 0.7 + n2 * 0.3;
 
-        // Boost edges of map (2-5 tiles from border) — natural tree line
-        const edgeDist = Math.min(col, row, GRID_SIZE - 1 - col, GRID_SIZE - 1 - row);
-        if (edgeDist >= 2 && edgeDist <= 5) {
-          score += 0.25;
-        } else if (edgeDist < 2) {
-          score += 0.15; // still some trees at very edge
+        // Boost tiles near the world boundary — natural forest border
+        // Uses same screen-space ellipse radii as the world mask
+        const sx = (col - row) - (GRID_COLS / 2 - GRID_ROWS / 2);
+        const sy = (col + row) - (GRID_COLS / 2 + GRID_ROWS / 2);
+        const maskRx = (GRID_COLS + GRID_ROWS) * 0.38;
+        const maskRy = (GRID_COLS + GRID_ROWS) * 0.36;
+        const edgeDist = (sx / maskRx) ** 2 + (sy / maskRy) ** 2;
+        if (edgeDist > 0.55) {
+          score += 0.35 * Math.min(1, (edgeDist - 0.55) / 0.4);
         }
 
         // Boost areas between districts (mid-ground dividers)
@@ -144,32 +127,37 @@ export class TreeManager {
         }
 
         // Slight reduction in dead center to keep town area open
-        const cx = col / GRID_SIZE - 0.5;
-        const cy = row / GRID_SIZE - 0.5;
-        const centerDist = Math.sqrt(cx * cx + cy * cy) * 2;
-        if (centerDist < 0.3) {
+        const cDist = Math.sqrt((col - GRID_COLS / 2) ** 2 + (row - GRID_ROWS / 2) ** 2);
+        if (cDist < 6) {
           score *= 0.5;
         }
 
-        candidates.push({ col, row, score });
+        candidates.push({ col, row, score, biome: this.tilemapManager.getTileDistrict(col, row) });
       }
     }
 
     // Sort by score descending — pick the top N
     candidates.sort((a, b) => b.score - a.score);
 
-    const targetCount = Math.floor(totalGrass * TARGET_PERCENT);
+    const targetCount = Math.floor(totalEligible * TARGET_PERCENT);
     const toPlace = candidates.slice(0, targetCount);
 
     // Place trees
-    for (const { col, row } of toPlace) {
+    for (const { col, row, biome } of toPlace) {
       const jx = (rand() - 0.5) * 0.5;
       const jy = (rand() - 0.5) * 0.5;
       const pos = this.tilemapManager.gridToScreen(col + jx, row + jy);
 
-      const frame = this.selectFrame(rand, weighted);
+      // Use biome-weighted selection if inside a district
+      const biomeWeights = biome ? BIOME_TREE_WEIGHTS[biome] : undefined;
+      const frame = biomeWeights
+        ? this.selectBiomeFrame(rand, biomeWeights)
+        : this.selectFrame(rand, weighted);
       const scale = this.getScale(frame.category, rand);
-      const tint = TREE_TINTS[Math.floor(rand() * TREE_TINTS.length)];
+
+      // Biome-specific tint
+      const tintPalette = biome ? (BIOME_TREE_TINTS[biome] ?? TREE_TINTS) : TREE_TINTS;
+      const tint = tintPalette[Math.floor(rand() * tintPalette.length)];
 
       // Shadow
       const shadow = this.scene.add.image(pos.x + 3, pos.y + 4, 'building-shadow');
@@ -186,13 +174,20 @@ export class TreeManager {
       sprite.setDepth(6.5 + (col + row) * 0.01);
       if (tint !== 0xffffff) sprite.setTint(tint);
 
+      const idx = this.sprites.length;
       this.sprites.push(sprite);
+
+      // Track which tile this tree sits on for clearing
+      const tileKey = `${col},${row}`;
+      const existing = this.tileIndex.get(tileKey);
+      if (existing) existing.push(idx);
+      else this.tileIndex.set(tileKey, [idx]);
     }
 
     // Log stats for verification
-    const pct = (toPlace.length / Math.max(1, totalGrass) * 100).toFixed(1);
+    const pct = (toPlace.length / Math.max(1, totalEligible) * 100).toFixed(1);
     console.log(
-      `[TreeManager] totalGrass=${totalGrass} placed=${toPlace.length} (${pct}% of grass)`,
+      `[TreeManager] eligible=${totalEligible} placed=${toPlace.length} (${pct}%)`,
     );
   }
 
@@ -203,7 +198,7 @@ export class TreeManager {
         if (dx === 0 && dy === 0) continue;
         const nc = col + dx;
         const nr = row + dy;
-        if (nc < 0 || nr < 0 || nc >= GRID_SIZE || nr >= GRID_SIZE) continue;
+        if (nc < 0 || nr < 0 || nc >= GRID_COLS || nr >= GRID_ROWS) continue;
         if (this.tilemapManager.getTileDistrict(nc, nr)) return true;
       }
     }
@@ -217,12 +212,24 @@ export class TreeManager {
       for (let dx = -4; dx <= 4; dx++) {
         const nc = col + dx;
         const nr = row + dy;
-        if (nc < 0 || nr < 0 || nc >= GRID_SIZE || nr >= GRID_SIZE) continue;
+        if (nc < 0 || nr < 0 || nc >= GRID_COLS || nr >= GRID_ROWS) continue;
         const cat = this.tilemapManager.getTileDistrict(nc, nr);
         if (cat) seen.add(cat);
       }
     }
     return seen.size >= 2;
+  }
+
+  /** Select a tree frame using biome-specific weight overrides. */
+  private selectBiomeFrame(rand: () => number, weightOverrides: Record<string, number>): TreeFrame {
+    const biomeWeighted: TreeFrame[] = [];
+    for (const f of TREE_FRAMES) {
+      const mult = weightOverrides[f.category] ?? 1;
+      const count = Math.round(f.weight * mult);
+      for (let i = 0; i < count; i++) biomeWeighted.push(f);
+    }
+    if (biomeWeighted.length === 0) return TREE_FRAMES[2]; // fallback to medium
+    return biomeWeighted[Math.floor(rand() * biomeWeighted.length)];
   }
 
   private selectFrame(rand: () => number, weighted: TreeFrame[]): TreeFrame {
@@ -246,10 +253,33 @@ export class TreeManager {
     }
   }
 
+  /** Clear tree sprites within a building footprint area. */
+  clearTilesForBuilding(col: number, row: number, size: number): void {
+    for (let dy = 0; dy < size; dy++) {
+      for (let dx = 0; dx < size; dx++) {
+        const key = `${col + dx},${row + dy}`;
+        const indices = this.tileIndex.get(key);
+        if (!indices) continue;
+        for (const idx of indices) {
+          if (this.sprites[idx]) {
+            this.sprites[idx].destroy();
+            (this.sprites as (Phaser.GameObjects.Image | null)[])[idx] = null;
+          }
+          if (this.shadows[idx]) {
+            this.shadows[idx].destroy();
+            (this.shadows as (Phaser.GameObjects.Image | null)[])[idx] = null;
+          }
+        }
+        this.tileIndex.delete(key);
+      }
+    }
+  }
+
   destroy(): void {
-    for (const s of this.sprites) s.destroy();
-    for (const s of this.shadows) s.destroy();
+    for (const s of this.sprites) if (s) s.destroy();
+    for (const s of this.shadows) if (s) s.destroy();
     this.sprites = [];
     this.shadows = [];
+    this.tileIndex.clear();
   }
 }

@@ -1,52 +1,57 @@
 import * as Phaser from 'phaser';
+import { seededRng, ValueNoise2D } from './noise';
+import { shouldBeWater } from './BiomeConfig';
+
+/* ── District definition with Voronoi seed + noise shaping ─────────── */
 
 interface DistrictDef {
   name: string;
   category: string;
   label: string;
   color: number;
-  gridX: number;
-  gridY: number;
-  width: number;
-  height: number;
+  /** Voronoi seed position (grid coordinates). */
+  seedCol: number;
+  seedRow: number;
+  /** Boundary jaggedness — higher = more irregular edges. */
+  noiseAmplitude: number;
+  /** Noise spatial frequency — higher = finer detail. */
+  noiseFrequency: number;
+  /** Shape roundness — 0 = fully noise-driven, 1 = perfectly circular. */
+  radialBias: number;
+  /** Distance multiplier — lower = bigger territory (default 1.0). */
+  sizeWeight: number;
+}
+
+export interface DistrictBounds {
+  minCol: number; maxCol: number;
+  minRow: number; maxRow: number;
+  centerCol: number; centerRow: number;
+  tileCount: number;
 }
 
 export const TILE_WIDTH = 64;
 export const TILE_HEIGHT = 32;
 const ROAD_COLOR = 0x566573;
 
-const DISTRICTS: DistrictDef[] = [
-  { name: 'Creative Quarter',  category: 'creative',    label: '\u{1F3A8} Creative Quarter',  color: 0xe8a87c, gridX: 1,  gridY: 1,  width: 8, height: 8 },
-  { name: 'Translation Ward',  category: 'translation', label: '\u{1F310} Translation Ward',  color: 0x85c1e9, gridX: 19, gridY: 1,  width: 8, height: 8 },
-  { name: 'Code Heights',      category: 'code',        label: '\u{1F9E0} Code Heights',      color: 0x7dcea0, gridX: 19, gridY: 19, width: 8, height: 8 },
-  { name: 'DeFi Docks',        category: 'defi',        label: '\u{1F4B0} DeFi Docks',        color: 0xf4d03f, gridX: 1,  gridY: 19, width: 8, height: 8 },
-  { name: 'Research Fields',   category: 'research',    label: '\u{1F52C} Research Fields',   color: 0x76d7c4, gridX: 19, gridY: 10, width: 8, height: 8 },
+/** Voronoi gap threshold — controls road width between districts. */
+const ROAD_THRESHOLD = 1.0;
+
+const ALL_DISTRICTS: DistrictDef[] = [
+  // Hub — Town Square at dead center, sizeWeight < 1 = claims more territory
+  { name: 'Town Square',       category: 'townsquare',  label: '\u{1F4CB} Town Square',       color: 0xc2b69a, seedCol: 28, seedRow: 28, noiseAmplitude: 2.5, noiseFrequency: 0.55, radialBias: 0.7, sizeWeight: 0.78 },
+  // Ring — 5 districts tighter to center to eliminate dead space
+  { name: 'Creative Quarter',  category: 'creative',    label: '\u{1F3A8} Creative Quarter',  color: 0x6db86b, seedCol: 19, seedRow: 19, noiseAmplitude: 3.5, noiseFrequency: 0.60, radialBias: 0.45, sizeWeight: 1.0 },
+  { name: 'Translation Ward',  category: 'translation', label: '\u{1F310} Translation Ward',  color: 0x5ba8c8, seedCol: 34, seedRow: 17, noiseAmplitude: 3.2, noiseFrequency: 0.65, radialBias: 0.25, sizeWeight: 1.0 },
+  { name: 'Code Heights',      category: 'code',        label: '\u{1F9E0} Code Heights',      color: 0x8fa8b8, seedCol: 40, seedRow: 30, noiseAmplitude: 3.0, noiseFrequency: 0.55, radialBias: 0.55, sizeWeight: 1.0 },
+  { name: 'Research Fields',   category: 'research',    label: '\u{1F52C} Research Fields',   color: 0x7b68ae, seedCol: 30, seedRow: 40, noiseAmplitude: 3.8, noiseFrequency: 0.60, radialBias: 0.35, sizeWeight: 1.0 },
+  { name: 'DeFi Docks',        category: 'defi',        label: '\u{1F4B0} DeFi Docks',        color: 0xc4713b, seedCol: 17, seedRow: 34, noiseAmplitude: 4.5, noiseFrequency: 0.70, radialBias: 0.15, sizeWeight: 1.0 },
 ];
 
-const TOWN_SQUARE: DistrictDef = {
-  name: 'Town Square',
-  category: 'townsquare',
-  label: '\u{1F4CB} Town Square',
-  color: 0xd5dbdb,
-  gridX: 10,
-  gridY: 10,
-  width: 8,
-  height: 8,
-};
+export const GRID_COLS = 56;
+export const GRID_ROWS = 56;
 
-const ALL_DISTRICTS = [...DISTRICTS, TOWN_SQUARE];
-
-export const GRID_SIZE = 28;
-
-/** Seeded PRNG (mulberry32) for deterministic irregular shapes. */
-function seededRng(seed: number) {
-  return () => {
-    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
-    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
-    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-    return ((t ^ t >>> 14) >>> 0) / 4294967296;
-  };
-}
+/** All district category names in order. */
+export const BIOME_NAMES = ALL_DISTRICTS.map(d => d.category);
 
 export class TilemapManager {
   private graphics: Phaser.GameObjects.Graphics;
@@ -57,16 +62,25 @@ export class TilemapManager {
   private hoveredDistrict: DistrictDef | null = null;
   private highlightedCell: { col: number; row: number } | null = null;
   private gridVisible = false;
+  private hoverEnabled = true;
   private offsetX: number;
   private offsetY: number;
   public worldWidth: number;
   public worldHeight: number;
   public townSquareCenterScreen: { x: number; y: number };
 
-  /** Per-district set of "col,row" keys defining the irregular shape. */
+  /** Per-district set of "col,row" keys defining the organic shape. */
   private districtTiles: Map<string, Set<string>> = new Map();
   /** Reverse lookup: "col,row" → DistrictDef for fast hover/click. */
   private tileLookup: Map<string, DistrictDef> = new Map();
+  /** Road tiles — the natural gap between Voronoi cells. */
+  private roadTiles: Set<string> = new Set();
+  /** Computed bounding box + centroid per district. */
+  private districtBounds: Map<string, DistrictBounds> = new Map();
+  /** Tiles occupied by buildings (for footprint system). */
+  private occupiedTiles: Map<string, { owner: string; tier: string }> = new Map();
+  /** Organic world boundary mask — only tiles inside are rendered. */
+  private worldMask: Set<string> = new Set();
 
   constructor(private scene: Phaser.Scene) {
     this.graphics = scene.add.graphics();
@@ -83,17 +97,24 @@ export class TilemapManager {
     this.gridOverlay.setDepth(3);
     this.gridOverlay.setVisible(false);
 
-    this.offsetX = (GRID_SIZE * TILE_WIDTH) / 2 + 100;
+    this.offsetX = (GRID_COLS * TILE_WIDTH) / 2 + 100;
     this.offsetY = 100;
 
-    this.worldWidth = GRID_SIZE * TILE_WIDTH;
-    this.worldHeight = GRID_SIZE * TILE_HEIGHT;
+    this.worldWidth = GRID_COLS * TILE_WIDTH;
+    this.worldHeight = GRID_ROWS * TILE_HEIGHT;
 
-    const tcCol = TOWN_SQUARE.gridX + TOWN_SQUARE.width / 2;
-    const tcRow = TOWN_SQUARE.gridY + TOWN_SQUARE.height / 2;
-    this.townSquareCenterScreen = this.gridToScreen(tcCol, tcRow);
-
+    // Generate organic world boundary, then Voronoi districts
+    this.generateWorldMask();
     this.generateDistrictShapes();
+
+    // Compute town square center from bounds
+    const tsBounds = this.districtBounds.get('townsquare');
+    if (tsBounds) {
+      this.townSquareCenterScreen = this.gridToScreen(tsBounds.centerCol, tsBounds.centerRow);
+    } else {
+      this.townSquareCenterScreen = this.getWorldCenter();
+    }
+
     this.render();
     this.drawGridLines();
     this.setupPointerTracking();
@@ -126,7 +147,7 @@ export class TilemapManager {
     for (const [dc, dr] of [[0, 0], [1, 0], [0, 1], [-1, 0], [0, -1]]) {
       const c = baseCol + dc;
       const r = baseRow + dr;
-      if (c < 0 || r < 0 || c >= GRID_SIZE || r >= GRID_SIZE) continue;
+      if (c < 0 || r < 0 || c >= GRID_COLS || r >= GRID_ROWS) continue;
       if (this.isPointInTile(worldX, worldY, c, r)) {
         return { col: c, row: r };
       }
@@ -139,81 +160,152 @@ export class TilemapManager {
     return Math.abs(px - x) / (TILE_WIDTH / 2) + Math.abs(py - y) / (TILE_HEIGHT / 2) <= 1;
   }
 
-  /* ── Irregular district shape generation ─────────────────────────── */
+  /* ── Organic world boundary mask ────────────────────────────────────── */
+
+  private generateWorldMask(): void {
+    const cx = GRID_COLS / 2;
+    const cy = GRID_ROWS / 2;
+    const boundaryNoise = new ValueNoise2D(24, 5555);
+    const boundaryNoise2 = new ValueNoise2D(32, 6666);
+    const boundaryNoise3 = new ValueNoise2D(48, 7777); // fine detail for petals
+
+    // Screen-space aligned coordinates (isometric axes)
+    const screenCenterX = cx - cy;
+    const screenCenterY = cx + cy;
+    // Shrink radii so the organic edge never hits the grid boundary
+    const rx = (GRID_COLS + GRID_ROWS) * 0.38;
+    const ry = (GRID_COLS + GRID_ROWS) * 0.36;
+
+    for (let row = 0; row < GRID_ROWS; row++) {
+      for (let col = 0; col < GRID_COLS; col++) {
+        const sx = (col - row) - screenCenterX;
+        const sy = (col + row) - screenCenterY;
+        const nx = sx / rx;
+        const ny = sy / ry;
+
+        // Ellipse base distance
+        const dist = nx * nx + ny * ny;
+
+        // Three-octave noise for organic petal-like edges
+        const n1 = boundaryNoise.sample(col * 0.18 + 50, row * 0.18 + 50);
+        const n2 = boundaryNoise2.sample(col * 0.4 + 70, row * 0.4 + 70);
+        const n3 = boundaryNoise3.sample(col * 0.8 + 30, row * 0.8 + 30);
+        const n = n1 * 0.5 + n2 * 0.3 + n3 * 0.2;
+        // Stronger noise modulation = more petal-like protrusions
+        const threshold = 1.0 + (n - 0.5) * 0.8;
+
+        if (dist < threshold) {
+          this.worldMask.add(`${col},${row}`);
+        }
+      }
+    }
+    console.log(`[TilemapManager] world mask: ${this.worldMask.size} tiles`);
+  }
+
+  /* ── Voronoi + Noise district generation ───────────────────────────── */
 
   private generateDistrictShapes(): void {
     const rand = seededRng(7331);
+    const noise = new ValueNoise2D(32, 7331);
+    const noise2 = new ValueNoise2D(48, 4242);   // higher-frequency detail octave
+    const roadNoise = new ValueNoise2D(24, 9999);
+    const roadNoise2 = new ValueNoise2D(36, 8888); // road detail octave
 
+    // Pre-generate per-district noise offsets for unique boundary shapes
+    const noiseOffsets = new Map<string, { ox: number; oy: number }>();
+    for (const d of ALL_DISTRICTS) {
+      noiseOffsets.set(d.category, { ox: rand() * 100, oy: rand() * 100 });
+    }
+
+    for (let row = 0; row < GRID_ROWS; row++) {
+      for (let col = 0; col < GRID_COLS; col++) {
+        // Skip tiles outside the organic world boundary
+        if (!this.worldMask.has(`${col},${row}`)) continue;
+        // Compute noise-displaced distance to each seed
+        const distances: { dist: number; district: DistrictDef }[] = [];
+
+        for (const d of ALL_DISTRICTS) {
+          const dx = col - d.seedCol;
+          const dy = row - d.seedRow;
+          let baseDist = Math.sqrt(dx * dx + dy * dy) * d.sizeWeight;
+
+          // Apply per-biome noise displacement for organic edges
+          const offset = noiseOffsets.get(d.category)!;
+          const nSample = noise.sample(
+            col * d.noiseFrequency + offset.ox,
+            row * d.noiseFrequency + offset.oy,
+          );
+          // Second octave at higher frequency for fine edge detail
+          const nDetail = noise2.sample(
+            col * d.noiseFrequency * 2.5 + offset.ox + 50,
+            row * d.noiseFrequency * 2.5 + offset.oy + 50,
+          );
+          const combined = nSample * 0.65 + nDetail * 0.35;
+          const noiseTerm = (combined - 0.5) * d.noiseAmplitude * (1 - d.radialBias * 0.3);
+          baseDist += noiseTerm;
+
+          distances.push({ dist: baseDist, district: d });
+        }
+
+        // Sort by displaced distance
+        distances.sort((a, b) => a.dist - b.dist);
+        const gap = distances[1].dist - distances[0].dist;
+
+        // Road determination: small gap = contested zone = natural road
+        const rn1 = roadNoise.sample(col * 0.3 + 50, row * 0.3 + 50);
+        const rn2 = roadNoise2.sample(col * 0.7 + 80, row * 0.7 + 80);
+        const rn = rn1 * 0.6 + rn2 * 0.4;
+        const effectiveThreshold = ROAD_THRESHOLD + (rn - 0.5) * 0.4;
+
+        const key = `${col},${row}`;
+
+        if (gap < effectiveThreshold) {
+          this.roadTiles.add(key);
+        } else {
+          const closest = distances[0].district;
+          const tiles = this.districtTiles.get(closest.category) ?? new Set<string>();
+          tiles.add(key);
+          this.districtTiles.set(closest.category, tiles);
+          this.tileLookup.set(key, closest);
+        }
+      }
+    }
+
+    this.computeDistrictBounds();
+
+    // Log tile counts
+    for (const d of ALL_DISTRICTS) {
+      const bounds = this.districtBounds.get(d.category);
+      console.log(`[TilemapManager] ${d.category}: ${bounds?.tileCount ?? 0} tiles`);
+    }
+    console.log(`[TilemapManager] roads: ${this.roadTiles.size} tiles`);
+  }
+
+  /** Compute bounding box + centroid for each district from actual tile set. */
+  private computeDistrictBounds(): void {
     for (const district of ALL_DISTRICTS) {
-      const tiles = new Set<string>();
-      const cx = district.gridX + district.width / 2;
-      const cy = district.gridY + district.height / 2;
+      const tiles = this.districtTiles.get(district.category);
+      if (!tiles || tiles.size === 0) continue;
 
-      for (let row = district.gridY; row < district.gridY + district.height; row++) {
-        for (let col = district.gridX; col < district.gridX + district.width; col++) {
-          if (col < 0 || row < 0 || col >= GRID_SIZE || row >= GRID_SIZE) continue;
+      let minCol = GRID_COLS, maxCol = 0, minRow = GRID_ROWS, maxRow = 0;
+      let sumCol = 0, sumRow = 0;
 
-          const edgeDist = Math.min(
-            col - district.gridX,
-            district.gridX + district.width - 1 - col,
-            row - district.gridY,
-            district.gridY + district.height - 1 - row,
-          );
+      tiles.forEach(key => {
+        const [c, r] = key.split(',').map(Number);
+        minCol = Math.min(minCol, c);
+        maxCol = Math.max(maxCol, c);
+        minRow = Math.min(minRow, r);
+        maxRow = Math.max(maxRow, r);
+        sumCol += c;
+        sumRow += r;
+      });
 
-          const dx = (col + 0.5 - cx) / (district.width / 2);
-          const dy = (row + 0.5 - cy) / (district.height / 2);
-          const centerDist = Math.sqrt(dx * dx + dy * dy);
-
-          let include = true;
-          if (edgeDist === 0) {
-            include = rand() < (0.35 - centerDist * 0.1);
-          } else if (edgeDist === 1) {
-            include = rand() < 0.7;
-          }
-
-          if (include) {
-            const key = `${col},${row}`;
-            if (!this.tileLookup.has(key)) {
-              tiles.add(key);
-              this.tileLookup.set(key, district);
-            }
-          }
-        }
-      }
-
-      const bulgeOffsets = [[-1, 0], [1, 0], [0, -1], [0, 1]];
-      for (let row = district.gridY; row < district.gridY + district.height; row++) {
-        for (let col = district.gridX; col < district.gridX + district.width; col++) {
-          const edgeDist = Math.min(
-            col - district.gridX,
-            district.gridX + district.width - 1 - col,
-            row - district.gridY,
-            district.gridY + district.height - 1 - row,
-          );
-          if (edgeDist !== 0) continue;
-
-          for (const [dc, dr] of bulgeOffsets) {
-            const nc = col + dc;
-            const nr = row + dr;
-            if (nc < 0 || nr < 0 || nc >= GRID_SIZE || nr >= GRID_SIZE) continue;
-
-            const inside = nc >= district.gridX && nc < district.gridX + district.width &&
-                           nr >= district.gridY && nr < district.gridY + district.height;
-            if (inside) continue;
-
-            const key = `${nc},${nr}`;
-            if (this.tileLookup.has(key)) continue;
-            if (this.isRoad(nc, nr)) continue;
-
-            if (rand() < 0.2) {
-              tiles.add(key);
-              this.tileLookup.set(key, district);
-            }
-          }
-        }
-      }
-
-      this.districtTiles.set(district.category, tiles);
+      this.districtBounds.set(district.category, {
+        minCol, maxCol, minRow, maxRow,
+        centerCol: sumCol / tiles.size,
+        centerRow: sumRow / tiles.size,
+        tileCount: tiles.size,
+      });
     }
   }
 
@@ -248,13 +340,6 @@ export class TilemapManager {
     gfx.strokePath();
   }
 
-  private darken(color: number, amount: number): number {
-    const r = Math.max(0, ((color >> 16) & 0xff) - amount);
-    const g = Math.max(0, ((color >> 8) & 0xff) - amount);
-    const b = Math.max(0, (color & 0xff) - amount);
-    return (r << 16) | (g << 8) | b;
-  }
-
   private lighten(color: number, amount: number): number {
     const r = Math.min(255, ((color >> 16) & 0xff) + amount);
     const g = Math.min(255, ((color >> 8) & 0xff) + amount);
@@ -263,13 +348,51 @@ export class TilemapManager {
   }
 
   public isRoad(col: number, row: number): boolean {
-    const hRoad1 = row === 9 && col >= 0 && col < GRID_SIZE;
-    const hRoad2 = row === 18 && col >= 0 && col < GRID_SIZE;
-    const vRoad1 = col === 9 && row >= 0 && row < GRID_SIZE;
-    const vRoad2 = col === 18 && row >= 0 && row < GRID_SIZE;
-    const crossH = row >= 13 && row <= 14 && col >= 0 && col < GRID_SIZE;
-    const crossV = col >= 13 && col <= 14 && row >= 0 && row < GRID_SIZE;
-    return hRoad1 || hRoad2 || vRoad1 || vRoad2 || crossH || crossV;
+    if (col < 0 || row < 0 || col >= GRID_COLS || row >= GRID_ROWS) return false;
+    return this.roadTiles.has(`${col},${row}`);
+  }
+
+  /** Check if a tile is within the organic world boundary. */
+  public isInWorld(col: number, row: number): boolean {
+    return this.worldMask.has(`${col},${row}`);
+  }
+
+  /** Get the biome category for a cell (district category or null for roads/edges). */
+  public getDistrictBiome(col: number, row: number): string | null {
+    return this.tileLookup.get(`${col},${row}`)?.category ?? null;
+  }
+
+  /** Check if a tile should be water based on its biome and position. */
+  public isWater(col: number, row: number): boolean {
+    const district = this.tileLookup.get(`${col},${row}`);
+    if (!district) return false;
+    const bounds = this.districtBounds.get(district.category);
+    if (!bounds) return false;
+    return shouldBeWater(
+      col, row, district.category,
+      bounds.centerCol, bounds.centerRow,
+      Math.max(1, (bounds.maxCol - bounds.minCol) / 2),
+      Math.max(1, (bounds.maxRow - bounds.minRow) / 2),
+    );
+  }
+
+  /* ── Tile occupation (building footprints) ─────────────────────────── */
+
+  public occupyTile(col: number, row: number, owner: string, tier: string): boolean {
+    const key = `${col},${row}`;
+    if (this.occupiedTiles.has(key)) return false;
+    if (this.roadTiles.has(key)) return false;
+    if (!this.tileLookup.has(key)) return false;
+    this.occupiedTiles.set(key, { owner, tier });
+    return true;
+  }
+
+  public isOccupied(col: number, row: number): boolean {
+    return this.occupiedTiles.has(`${col},${row}`);
+  }
+
+  public clearOccupation(col: number, row: number): void {
+    this.occupiedTiles.delete(`${col},${row}`);
   }
 
   /* ── Cursor tile highlight ───────────────────────────────────────── */
@@ -280,11 +403,9 @@ export class TilemapManager {
     const hw = TILE_WIDTH / 2;
     const hh = TILE_HEIGHT / 2;
 
-    // Subtle white diamond outline
     this.cursorGraphics.lineStyle(1.5, 0xffffff, 0.5);
     this.drawDiamondStroke(this.cursorGraphics, col, row);
 
-    // Faint fill
     this.cursorGraphics.fillStyle(0xffffff, 0.08);
     this.cursorGraphics.beginPath();
     this.cursorGraphics.moveTo(x, y - hh);
@@ -299,8 +420,9 @@ export class TilemapManager {
 
   private drawGridLines(): void {
     this.gridOverlay.lineStyle(0.5, 0xffffff, 0.12);
-    for (let row = 0; row < GRID_SIZE; row++) {
-      for (let col = 0; col < GRID_SIZE; col++) {
+    for (let row = 0; row < GRID_ROWS; row++) {
+      for (let col = 0; col < GRID_COLS; col++) {
+        if (!this.worldMask.has(`${col},${row}`)) continue;
         this.drawDiamondStroke(this.gridOverlay, col, row);
       }
     }
@@ -320,7 +442,7 @@ export class TilemapManager {
     this.scene.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
       const cell = this.screenToGrid(pointer.worldX, pointer.worldY);
 
-      // Update cursor tile highlight
+      // Cursor highlight always active (individual tile)
       if (cell && (cell.col !== this.highlightedCell?.col || cell.row !== this.highlightedCell?.row)) {
         this.highlightedCell = cell;
         this.drawCursorHighlight(cell.col, cell.row);
@@ -329,11 +451,12 @@ export class TilemapManager {
         this.cursorGraphics.clear();
       }
 
-      // Update district hover
+      // District hover overlay only in overview mode
+      if (!this.hoverEnabled) return;
+
       let found: DistrictDef | null = null;
       if (cell) {
-        const key = `${cell.col},${cell.row}`;
-        found = this.tileLookup.get(key) ?? null;
+        found = this.tileLookup.get(`${cell.col},${cell.row}`) ?? null;
       }
 
       if (found !== this.hoveredDistrict) {
@@ -349,11 +472,13 @@ export class TilemapManager {
       );
       if (dist > 8) return;
 
+      const hits = this.scene.input.hitTestPointer(pointer);
+      if (hits.length > 0) return;
+
       const cell = this.screenToGrid(pointer.worldX, pointer.worldY);
       if (!cell) return;
 
-      const key = `${cell.col},${cell.row}`;
-      const district = this.tileLookup.get(key);
+      const district = this.tileLookup.get(`${cell.col},${cell.row}`);
       if (district) this.onDistrictClick(district);
     });
   }
@@ -414,17 +539,18 @@ export class TilemapManager {
   /* ── Main render ─────────────────────────────────────────────────── */
 
   private render(): void {
-    for (let row = 0; row < GRID_SIZE; row++) {
-      for (let col = 0; col < GRID_SIZE; col++) {
+    for (let row = 0; row < GRID_ROWS; row++) {
+      for (let col = 0; col < GRID_COLS; col++) {
+        if (!this.worldMask.has(`${col},${row}`)) continue;
+
         const key = `${col},${row}`;
         const district = this.tileLookup.get(key);
 
         if (district) {
-          this.drawTileFill(this.graphics, col, row, district.color, 0.25);
-        } else if (this.isRoad(col, row)) {
+          this.drawTileFill(this.graphics, col, row, district.color, 0.35);
+        } else if (this.roadTiles.has(key)) {
           this.drawTileFill(this.graphics, col, row, ROAD_COLOR, 0.25);
         }
-        // Non-district, non-road tiles: no overlay — grass tile shows through
       }
     }
 
@@ -436,17 +562,16 @@ export class TilemapManager {
   /* ── Styled label badges ─────────────────────────────────────────── */
 
   private addLabel(district: DistrictDef): void {
-    const centerCol = district.gridX + district.width / 2;
-    const centerRow = district.gridY + district.height / 2;
-    const { x, y } = this.gridToScreen(centerCol, centerRow);
+    const bounds = this.districtBounds.get(district.category);
+    if (!bounds) return;
+    const { x, y } = this.gridToScreen(bounds.centerCol, bounds.centerRow);
 
     const labelText = district.name;
 
-    // Text element
     const text = this.scene.add.text(0, 0, labelText, {
       fontSize: '13px',
       color: '#e0e0e0',
-      fontFamily: '"Inter", "Segoe UI", system-ui, sans-serif',
+      fontFamily: '"Cinzel", serif',
     });
     text.setOrigin(0, 0.5);
 
@@ -457,27 +582,22 @@ export class TilemapManager {
     const totalWidth = text.width + paddingX * 2 + dotRadius * 2 + dotGap;
     const totalHeight = text.height + paddingY * 2;
 
-    // Rounded-rect background
     const bg = this.scene.add.graphics();
     bg.fillStyle(0x000000, 0.65);
     bg.fillRoundedRect(-totalWidth / 2, -totalHeight / 2, totalWidth, totalHeight, 6);
     bg.lineStyle(1, 0xffffff, 0.15);
     bg.strokeRoundedRect(-totalWidth / 2, -totalHeight / 2, totalWidth, totalHeight, 6);
 
-    // Colored dot indicating zone type
     const dot = this.scene.add.graphics();
     dot.fillStyle(district.color, 1);
     dot.fillCircle(-totalWidth / 2 + paddingX + dotRadius, 0, dotRadius);
 
-    // Position text after the dot
     text.setX(-totalWidth / 2 + paddingX + dotRadius * 2 + dotGap);
 
-    // Assemble into container
     const container = this.scene.add.container(x, y, [bg, dot, text]);
     container.setDepth(10);
     container.setAlpha(0);
 
-    // Fade-in animation
     this.scene.tweens.add({
       targets: container,
       alpha: 1,
@@ -491,7 +611,51 @@ export class TilemapManager {
 
   /* ── Public API ──────────────────────────────────────────────────── */
 
-  /** Set all district label alphas immediately (used to hide during intro). */
+  getWorldCenter(): { x: number; y: number } {
+    return this.gridToScreen(GRID_COLS / 2, GRID_ROWS / 2);
+  }
+
+  getDistrictBounds(category: string): DistrictBounds | undefined {
+    return this.districtBounds.get(category);
+  }
+
+  getDistrictCenter(category: string): { x: number; y: number } | null {
+    const bounds = this.districtBounds.get(category);
+    if (!bounds) return null;
+    return this.gridToScreen(bounds.centerCol, bounds.centerRow);
+  }
+
+  getDistrictTiles(category: string): Set<string> | undefined {
+    return this.districtTiles.get(category);
+  }
+
+  getTileDistrict(col: number, row: number): string | undefined {
+    return this.tileLookup.get(`${col},${row}`)?.category;
+  }
+
+  setHoverEnabled(enabled: boolean): void {
+    this.hoverEnabled = enabled;
+    if (!enabled) {
+      this.hoveredDistrict = null;
+      this.highlightedCell = null;
+      this.hoverGraphics.clear();
+      this.cursorGraphics.clear();
+      this.scene.game.canvas.style.cursor = 'default';
+    }
+  }
+
+  setLabelsVisible(visible: boolean, duration = 400): void {
+    for (const label of this.labels) {
+      this.scene.tweens.killTweensOf(label);
+      this.scene.tweens.add({
+        targets: label,
+        alpha: visible ? 1 : 0,
+        duration,
+        ease: 'Cubic.easeOut',
+      });
+    }
+  }
+
   setLabelsAlpha(alpha: number): void {
     for (const label of this.labels) {
       this.scene.tweens.killTweensOf(label);
@@ -499,7 +663,18 @@ export class TilemapManager {
     }
   }
 
-  /** Fade in district labels with staggered timing (100ms apart). */
+  setLabelsScale(scale: number, duration = 400): void {
+    for (const label of this.labels) {
+      this.scene.tweens.add({
+        targets: label,
+        scaleX: scale,
+        scaleY: scale,
+        duration,
+        ease: 'Cubic.easeOut',
+      });
+    }
+  }
+
   fadeInLabelsStaggered(duration = 400, startDelay = 0): void {
     this.labels.forEach((label, i) => {
       label.setAlpha(0);
@@ -511,22 +686,6 @@ export class TilemapManager {
         ease: 'Cubic.easeOut',
       });
     });
-  }
-
-  getDistrictCenter(category: string): { x: number; y: number } | null {
-    const district = ALL_DISTRICTS.find(d => d.category === category);
-    if (!district) return null;
-    const centerCol = district.gridX + district.width / 2;
-    const centerRow = district.gridY + district.height / 2;
-    return this.gridToScreen(centerCol, centerRow);
-  }
-
-  getDistrictTiles(category: string): Set<string> | undefined {
-    return this.districtTiles.get(category);
-  }
-
-  getTileDistrict(col: number, row: number): string | undefined {
-    return this.tileLookup.get(`${col},${row}`)?.category;
   }
 
   destroy(): void {

@@ -39,7 +39,7 @@ export interface AgentVisual {
 }
 
 export interface FeedEvent {
-  type: 'mission_completed' | 'mission_rated' | 'guild_created' | 'agent_registered';
+  type: 'mission_completed' | 'mission_created' | 'mission_rated' | 'guild_created' | 'agent_registered';
   guildId: number;
   missionId?: number;
   score?: number;
@@ -72,21 +72,65 @@ export function getAgentTier(rating: number, missions: number): AgentVisual['tie
   return 'tent';
 }
 
+/** Voronoi seed positions (grid coordinates) matching TilemapManager districts. */
 export const DISTRICT_CENTERS: Record<string, { x: number; y: number; width: number }> = {
-  meme:        { x: 100, y: 100, width: 8 },
-  creative:    { x: 100, y: 100, width: 8 },
-  translation: { x: 400, y: 100, width: 8 },
-  code:        { x: 700, y: 100, width: 8 },
-  defi:        { x: 100, y: 400, width: 8 },
-  research:    { x: 400, y: 400, width: 8 },
+  townsquare:  { x: 28, y: 28, width: 14 },
+  creative:    { x: 19, y: 19, width: 12 },
+  translation: { x: 34, y: 17, width: 12 },
+  code:        { x: 40, y: 30, width: 12 },
+  research:    { x: 30, y: 40, width: 12 },
+  defi:        { x: 17, y: 34, width: 12 },
 };
 
-export function getGuildPosition(guildId: number, category: string) {
-  const district = DISTRICT_CENTERS[category] || DISTRICT_CENTERS['creative'];
-  const col = (guildId * 3) % district.width;
-  const row = Math.floor((guildId * 3) / district.width);
+/** Valid district categories on the tilemap. */
+const VALID_DISTRICTS = new Set(Object.keys(DISTRICT_CENTERS));
+
+/** Map guild categories to district categories (some categories share a district). */
+export function categoryToDistrict(category: string): string {
+  const mapping: Record<string, string> = {
+    meme: 'creative',
+    'content-creation': 'creative',
+    math: 'research',
+    science: 'research',
+    analytics: 'research',
+    trading: 'defi',
+    finance: 'defi',
+    writing: 'creative',
+    art: 'creative',
+    design: 'creative',
+    dev: 'code',
+    engineering: 'code',
+    language: 'translation',
+    test: 'townsquare',
+    general: 'townsquare',
+  };
+  const mapped = mapping[category] ?? category;
+  // Fallback: if the mapped category isn't a real district, place in townsquare
+  return VALID_DISTRICTS.has(mapped) ? mapped : 'townsquare';
+}
+
+/** Simple seeded hash for deterministic placement per guild. */
+function guildHash(guildId: number): number {
+  let h = guildId * 2654435761;
+  h = ((h >>> 16) ^ h) * 0x45d9f3b;
+  h = ((h >>> 16) ^ h) * 0x45d9f3b;
+  return (h >>> 16) ^ h;
+}
+
+/**
+ * Get a deterministic grid position for a guild within its district.
+ * Returns grid tile coordinates (not pixel positions).
+ */
+export function getGuildPosition(guildId: number, category: string): { x: number; y: number } {
+  const districtKey = categoryToDistrict(category);
+  const district = DISTRICT_CENTERS[districtKey] || DISTRICT_CENTERS['creative'];
+  const hash = guildHash(guildId);
+  const halfW = Math.floor(district.width / 2);
+  // Spread guilds in a spiral-like pattern around district center
+  const offsetX = ((hash & 0xFF) % (district.width - 2)) - halfW + 1;
+  const offsetY = (((hash >> 8) & 0xFF) % (district.width - 2)) - halfW + 1;
   return {
-    x: district.x + col * 64,
-    y: district.y + row * 64,
+    x: district.x + offsetX,
+    y: district.y + offsetY,
   };
 }
