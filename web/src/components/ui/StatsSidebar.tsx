@@ -1,6 +1,7 @@
 'use client';
 
-import { MOCK_STATS, MOCK_FEED, MOCK_WALLET, timeAgo } from '@/lib/mock-data';
+import { useStats, useCredits, useSSEFeed, useOnlineAgents } from '@/lib/hooks';
+import { timeAgo } from '@/lib/mock-data';
 
 interface StatsSidebarProps {
   open: boolean;
@@ -9,6 +10,7 @@ interface StatsSidebarProps {
 const FEED_COLORS: Record<string, string> = {
   mission_completed: 'var(--verdigris)',
   mission_rated: 'var(--gold)',
+  mission_created: 'var(--ember)',
   guild_created: 'var(--plum)',
   agent_registered: 'var(--indigo)',
 };
@@ -16,11 +18,21 @@ const FEED_COLORS: Record<string, string> = {
 const FEED_LABELS: Record<string, (e: { missionId?: number; guildId: number; score?: number }) => string> = {
   mission_completed: e => `Mission #${e.missionId} done`,
   mission_rated: e => `Rating ${'★'.repeat(e.score || 0)} #${e.missionId}`,
+  mission_created: e => `Mission #${e.missionId} created`,
   guild_created: e => `Guild #${e.guildId} founded`,
   agent_registered: e => `Agent joined guild #${e.guildId}`,
 };
 
 export default function StatsSidebar({ open }: StatsSidebarProps) {
+  const { data: stats } = useStats();
+  const { data: credits } = useCredits();
+  const { data: onlineAgents } = useOnlineAgents();
+  const feed = useSSEFeed();
+
+  const onlineCount = onlineAgents?.length ?? 0;
+  const balance = credits ? credits.raw.toFixed(4) : '0.0000';
+  const missionsRemaining = credits ? Math.floor(credits.raw / 0.001) : 0;
+
   return (
     <div
       className="panel"
@@ -45,17 +57,17 @@ export default function StatsSidebar({ open }: StatsSidebarProps) {
       {/* PLATFORM STATS */}
       <div className="section-header">Platform</div>
 
-      <StatRow label="Guilds" value={String(MOCK_STATS.totalGuilds)} />
-      <StatRow label="Missions" value={String(MOCK_STATS.totalMissions)} />
-      <StatRow label="Completed" value={String(MOCK_STATS.totalMissions - 1)} />
-      <StatRow label="Agents" value={String(MOCK_STATS.totalAgents)} />
-      <StatRow label="Online" value="2" showDot />
+      <StatRow label="Guilds" value={String(stats?.guilds ?? 0)} />
+      <StatRow label="Missions" value={String(stats?.missionsCreated ?? 0)} />
+      <StatRow label="Completed" value={String(stats?.missionsCompleted ?? 0)} />
+      <StatRow label="Agents" value={String(stats?.agents ?? 0)} />
+      <StatRow label="Online" value={String(onlineCount)} showDot={onlineCount > 0} />
 
       {/* ACTIVITY FEED */}
       <div className="section-header" style={{ marginTop: 8 }}>Activity</div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {MOCK_FEED.map((event, i) => {
+        {feed.map((event, i) => {
           const color = FEED_COLORS[event.type] || 'var(--parchment-dim)';
           const labelFn = FEED_LABELS[event.type];
           const label = labelFn ? labelFn(event) : event.type;
@@ -110,7 +122,7 @@ export default function StatsSidebar({ open }: StatsSidebarProps) {
           padding: '4px 0',
         }}
       >
-        &#x2B21; {MOCK_WALLET.balance} MON
+        &#x2B21; {balance} MON
       </div>
       <div
         style={{
@@ -120,7 +132,7 @@ export default function StatsSidebar({ open }: StatsSidebarProps) {
           fontStyle: 'italic',
         }}
       >
-        ~{MOCK_WALLET.missionsRemaining} missions remaining
+        ~{missionsRemaining} missions remaining
       </div>
     </div>
   );

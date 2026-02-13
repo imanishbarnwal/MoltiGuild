@@ -11,7 +11,7 @@ interface PlotDeedProps {
 export default function PlotDeed({ plot, onClose, onClaim }: PlotDeedProps) {
   return (
     <>
-      {/* Backdrop */}
+      {/* Backdrop + centering */}
       <div
         onClick={onClose}
         style={{
@@ -20,19 +20,18 @@ export default function PlotDeed({ plot, onClose, onClaim }: PlotDeedProps) {
           background: 'rgba(8,9,14,0.4)',
           zIndex: 109,
           pointerEvents: 'auto',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
         }}
-      />
+      >
 
       {/* Deed */}
       <div
         className="panel"
+        onClick={e => e.stopPropagation()}
         style={{
-          position: 'fixed',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
           width: 300,
-          zIndex: 110,
           pointerEvents: 'auto',
           animation: 'scaleIn 200ms ease-out both',
           padding: '20px 24px',
@@ -101,6 +100,7 @@ export default function PlotDeed({ plot, onClose, onClaim }: PlotDeedProps) {
             Close
           </button>
         </div>
+      </div>
       </div>
     </>
   );

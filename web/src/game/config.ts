@@ -5,7 +5,7 @@ export const gameConfig: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   width: 1280,
   height: 720,
-  backgroundColor: '#2a3f5f',
+  backgroundColor: '#08090e',
   parent: 'phaser-container',
   pixelArt: true,
   scale: {

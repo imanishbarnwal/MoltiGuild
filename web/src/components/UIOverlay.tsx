@@ -8,11 +8,14 @@ import GuildCard from '@/components/ui/GuildCard';
 import PlotDeed from '@/components/ui/PlotDeed';
 import GuildCreateModal from '@/components/ui/GuildCreateModal';
 import AgentRegisterModal from '@/components/ui/AgentRegisterModal';
-import { MOCK_GUILDS, MOCK_PLOTS } from '@/lib/mock-data';
+import { MOCK_PLOTS } from '@/lib/mock-data';
+import { useGuildVisuals } from '@/lib/hooks';
 
 type ActiveModal = 'none' | 'guild-create' | 'agent-register';
 
 export default function UIOverlay() {
+  const guildVisuals = useGuildVisuals();
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chatExpanded, setChatExpanded] = useState(false);
   const [activeGuild, setActiveGuild] = useState<number | null>(null);
@@ -46,14 +49,25 @@ export default function UIOverlay() {
       }
     };
 
+    const handleBackToOverview = () => {
+      setInDistrict(false);
+      setSidebarOpen(false);
+      setChatExpanded(false);
+      setActiveGuild(null);
+      setActivePlot(null);
+      setActiveModal('none');
+    };
+
     window.addEventListener('district-clicked', handleDistrictClick);
     window.addEventListener('guild-clicked', handleGuildClick);
     window.addEventListener('empty-lot-clicked', handleEmptyLotClick);
+    window.addEventListener('back-to-overview', handleBackToOverview);
 
     return () => {
       window.removeEventListener('district-clicked', handleDistrictClick);
       window.removeEventListener('guild-clicked', handleGuildClick);
       window.removeEventListener('empty-lot-clicked', handleEmptyLotClick);
+      window.removeEventListener('back-to-overview', handleBackToOverview);
     };
   }, []);
 
@@ -64,10 +78,12 @@ export default function UIOverlay() {
     setActiveGuild(null);
     setActivePlot(null);
     setActiveModal('none');
+    // Also tell Phaser to zoom out
+    window.dispatchEvent(new CustomEvent('request-overview'));
   }, []);
 
   const selectedGuild = activeGuild != null
-    ? MOCK_GUILDS.find(g => g.guildId === activeGuild) ?? MOCK_GUILDS[0]
+    ? guildVisuals.find(g => g.guildId === activeGuild) ?? guildVisuals[0]
     : null;
 
   const selectedPlot = activePlot != null
@@ -80,7 +96,7 @@ export default function UIOverlay() {
         position: 'fixed',
         inset: 0,
         pointerEvents: 'none',
-        zIndex: 50,
+        zIndex: 100,
       }}
     >
       {/* Header */}

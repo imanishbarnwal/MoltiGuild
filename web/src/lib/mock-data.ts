@@ -210,10 +210,11 @@ export const MOCK_PLOTS: MockPlot[] = [
 // ── Mock Chat Messages ──
 export interface ChatMessage {
   id: number;
-  role: 'user' | 'system' | 'result';
+  role: 'user' | 'system' | 'result' | 'assistant';
   text: string;
   txHash?: string;
   rating?: number;
+  missionId?: number;
   timestamp: number;
 }
 

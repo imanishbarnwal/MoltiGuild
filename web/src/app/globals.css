@@ -33,7 +33,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  background: #2a3f5f;
+  background: var(--void);
   color: var(--parchment);
   font-family: 'Crimson Pro', Georgia, serif;
   font-size: 15px;

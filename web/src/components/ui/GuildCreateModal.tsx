@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useCreateGuild, useCredits } from '@/lib/hooks';
 
 interface GuildCreateModalProps {
   plotId?: number;
@@ -23,10 +24,37 @@ export default function GuildCreateModal({ plotId = 6, district = 'Creative Quar
   const [name, setName] = useState('');
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
+  const [error, setError] = useState('');
+
+  const createGuild = useCreateGuild();
+  const { data: credits } = useCredits();
+
+  const balance = credits ? credits.raw.toFixed(4) : '0.0000';
+
+  const handleCreate = () => {
+    if (!name.trim() || !category) {
+      setError('Name and category are required.');
+      return;
+    }
+    setError('');
+    const adminKey = typeof window !== 'undefined'
+      ? (process.env.NEXT_PUBLIC_ADMIN_KEY ?? '')
+      : '';
+
+    createGuild.mutate(
+      { name: name.trim(), category, adminKey },
+      {
+        onSuccess: () => onClose(),
+        onError: (err) => {
+          setError(err instanceof Error ? err.message : 'Guild creation failed');
+        },
+      },
+    );
+  };
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Backdrop + centering */}
       <div
         onClick={onClose}
         style={{
@@ -36,20 +64,19 @@ export default function GuildCreateModal({ plotId = 6, district = 'Creative Quar
           backdropFilter: 'blur(8px)',
           zIndex: 119,
           pointerEvents: 'auto',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
         }}
-      />
+      >
 
       {/* Modal */}
       <div
+        onClick={e => e.stopPropagation()}
         style={{
-          position: 'fixed',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
           width: 420,
           maxHeight: 'calc(100vh - 80px)',
           overflowY: 'auto',
-          zIndex: 120,
           pointerEvents: 'auto',
           animation: 'modalReveal 250ms ease-out both',
           background: 'var(--walnut)',
@@ -190,19 +217,32 @@ export default function GuildCreateModal({ plotId = 6, district = 'Creative Quar
               marginBottom: 20,
             }}
           >
-            Your purse: <span style={{ color: 'var(--gold)' }}>&#x2B21; 0.049</span>
+            Your purse: <span style={{ color: 'var(--gold)' }}>&#x2B21; {balance}</span>
           </div>
+
+          {/* Error */}
+          {error && (
+            <div style={{ color: 'var(--wine)', fontFamily: "'Crimson Pro', serif", fontSize: 13, marginBottom: 12 }}>
+              {error}
+            </div>
+          )}
 
           {/* Buttons */}
           <div style={{ display: 'flex', gap: 12, justifyContent: 'space-between' }}>
-            <button className="btn-solid" style={{ flex: 1 }}>
-              Found Guild
+            <button
+              className="btn-solid"
+              style={{ flex: 1, opacity: createGuild.isPending ? 0.5 : 1 }}
+              onClick={handleCreate}
+              disabled={createGuild.isPending}
+            >
+              {createGuild.isPending ? 'Creating...' : 'Found Guild'}
             </button>
             <button className="btn-ghost" onClick={onClose}>
               Abandon
             </button>
           </div>
         </div>
+      </div>
       </div>
     </>
   );

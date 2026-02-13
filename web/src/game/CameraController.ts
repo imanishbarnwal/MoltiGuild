@@ -6,7 +6,7 @@ export class CameraController {
   private dragStartX = 0;
   private dragStartY = 0;
   private minZoom = 0.5;
-  private maxZoom = 2;
+  private maxZoom = 4;
   private enabled = true;
 
   /** Screen-space exclusion zone (minimap) where drag should not start. */
@@ -15,12 +15,15 @@ export class CameraController {
   constructor(private scene: Phaser.Scene, worldWidth: number, worldHeight: number) {
     this.camera = scene.cameras.main;
 
-    // Set camera bounds to world size
+    // Set camera bounds using isometric bounding box dimensions
+    // The isometric diamond extends beyond the simple grid*tile dimensions
+    const isoW = worldWidth * 1.2;
+    const isoH = worldHeight * 2.5;
     this.camera.setBounds(
-      -worldWidth / 2,
-      -100,
-      worldWidth * 1.5,
-      worldHeight * 1.5
+      -isoW * 0.3,
+      -isoH * 0.2,
+      isoW * 1.6,
+      isoH * 1.4
     );
 
     this.setupDragPan();

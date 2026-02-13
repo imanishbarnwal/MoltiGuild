@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { MOCK_GUILDS } from '@/lib/mock-data';
+import { useState, useEffect, useCallback } from 'react';
+import { useGuilds, useAutoSetup } from '@/lib/hooks';
+import * as api from '@/lib/api';
 
 interface AgentRegisterModalProps {
   onClose: () => void;
@@ -30,26 +31,75 @@ export default function AgentRegisterModal({ onClose }: AgentRegisterModalProps)
   const [capability, setCapability] = useState('');
   const [price, setPrice] = useState('0.0005');
   const [modalState, setModalState] = useState<ModalState>('form');
+  const [generatedAddress, setGeneratedAddress] = useState('');
+  const [generatedKey, setGeneratedKey] = useState('');
+  const [error, setError] = useState('');
+  const [steps, setSteps] = useState<ProgressStep[]>([]);
 
-  const generatedAddress = '0xa4F2D3e891bC5041f27Ae3D9c0108c1D';
+  const { data: guilds } = useGuilds();
+  const autoSetup = useAutoSetup();
 
-  const progressSteps: ProgressStep[] = [
-    { label: 'Key forged', status: 'done' },
-    { label: 'Faucet: 0.1 MON received', status: 'done' },
-    { label: 'Inscribing on-chain...', status: 'active' },
-    { label: 'Joining guild...', status: 'pending' },
-  ];
+  const guildList = guilds ?? [];
 
-  const handleBind = () => setModalState('progress');
+  // Generate a keypair on mount
+  useEffect(() => {
+    generateKeypair();
+  }, []);
 
-  // Simulate progress completion
-  if (modalState === 'progress') {
-    setTimeout(() => setModalState('success'), 2500);
-  }
+  const generateKeypair = useCallback(async () => {
+    try {
+      // Use viem for proper key generation
+      const { generatePrivateKey, privateKeyToAccount } = await import('viem/accounts');
+      const pk = generatePrivateKey();
+      const account = privateKeyToAccount(pk);
+      setGeneratedKey(pk);
+      setGeneratedAddress(account.address);
+    } catch {
+      // Fallback: generate a random hex string
+      const bytes = crypto.getRandomValues(new Uint8Array(32));
+      const hex = '0x' + Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+      setGeneratedKey(hex);
+      setGeneratedAddress('0x' + hex.slice(2, 42));
+    }
+  }, []);
+
+  const handleBind = useCallback(async () => {
+    if (!guildId) {
+      setError('Please select a guild.');
+      return;
+    }
+    setError('');
+    setModalState('progress');
+
+    const progressSteps: ProgressStep[] = [
+      { label: 'Key forged', status: 'done' },
+      { label: 'Requesting faucet funds...', status: 'active' },
+      { label: 'Joining guild...', status: 'pending' },
+    ];
+    setSteps([...progressSteps]);
+
+    try {
+      // Step 1: Auto-setup (faucet)
+      await autoSetup.mutateAsync();
+      progressSteps[1] = { label: 'Faucet: 0.1 MON received', status: 'done' };
+      progressSteps[2] = { label: 'Joining guild...', status: 'active' };
+      setSteps([...progressSteps]);
+
+      // Step 2: Join guild (simplified — no real signature for testnet)
+      await api.joinGuild(generatedAddress, Number(guildId), '0x', Date.now());
+      progressSteps[2] = { label: 'Joined guild!', status: 'done' };
+      setSteps([...progressSteps]);
+
+      setModalState('success');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Registration failed');
+      setModalState('form');
+    }
+  }, [guildId, generatedAddress, autoSetup]);
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Backdrop + centering */}
       <div
         onClick={onClose}
         style={{
@@ -59,20 +109,19 @@ export default function AgentRegisterModal({ onClose }: AgentRegisterModalProps)
           backdropFilter: 'blur(8px)',
           zIndex: 119,
           pointerEvents: 'auto',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
         }}
-      />
+      >
 
       {/* Modal */}
       <div
+        onClick={e => e.stopPropagation()}
         style={{
-          position: 'fixed',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
           width: 420,
           maxHeight: 'calc(100vh - 80px)',
           overflowY: 'auto',
-          zIndex: 120,
           pointerEvents: 'auto',
           animation: 'modalReveal 250ms ease-out both',
           background: 'var(--walnut)',
@@ -128,23 +177,26 @@ export default function AgentRegisterModal({ onClose }: AgentRegisterModalProps)
               generatedAddress={generatedAddress}
               guildId={guildId}
               setGuildId={setGuildId}
+              guildList={guildList}
               capability={capability}
               setCapability={setCapability}
               price={price}
               setPrice={setPrice}
+              error={error}
               onBind={handleBind}
               onClose={onClose}
             />
           )}
 
           {modalState === 'progress' && (
-            <ProgressView steps={progressSteps} />
+            <ProgressView steps={steps} />
           )}
 
           {modalState === 'success' && (
-            <SuccessView address={generatedAddress} onClose={onClose} />
+            <SuccessView address={generatedAddress} privateKey={generatedKey} onClose={onClose} />
           )}
         </div>
+      </div>
       </div>
     </>
   );
@@ -156,10 +208,12 @@ function FormView({
   generatedAddress,
   guildId,
   setGuildId,
+  guildList,
   capability,
   setCapability,
   price,
   setPrice,
+  error,
   onBind,
   onClose,
 }: {
@@ -168,10 +222,12 @@ function FormView({
   generatedAddress: string;
   guildId: string;
   setGuildId: (v: string) => void;
+  guildList: { guildId: string; name: string }[];
   capability: string;
   setCapability: (v: string) => void;
   price: string;
   setPrice: (v: string) => void;
+  error: string;
   onBind: () => void;
   onClose: () => void;
 }) {
@@ -239,7 +295,7 @@ function FormView({
       </div>
 
       {/* Generated Address Display */}
-      {walletMode === 'generate' && (
+      {walletMode === 'generate' && generatedAddress && (
         <div
           className="font-mono"
           style={{
@@ -259,6 +315,7 @@ function FormView({
           <button
             className="btn-ghost"
             style={{ padding: '4px 10px', fontSize: 11, letterSpacing: '0.05em' }}
+            onClick={() => navigator.clipboard?.writeText(generatedAddress)}
           >
             Copy
           </button>
@@ -276,7 +333,7 @@ function FormView({
         style={{ marginBottom: 16, cursor: 'pointer' }}
       >
         <option value="">Select guild...</option>
-        {MOCK_GUILDS.map(g => (
+        {guildList.map(g => (
           <option key={g.guildId} value={g.guildId}>
             {g.name} (#{g.guildId})
           </option>
@@ -319,6 +376,13 @@ function FormView({
         </span>
       </div>
 
+      {/* Error */}
+      {error && (
+        <div style={{ color: 'var(--wine)', fontFamily: "'Crimson Pro', serif", fontSize: 13, marginBottom: 12 }}>
+          {error}
+        </div>
+      )}
+
       {/* Buttons */}
       <div style={{ display: 'flex', gap: 12, justifyContent: 'space-between' }}>
         <button className="btn-solid" style={{ flex: 1 }} onClick={onBind}>
@@ -333,6 +397,9 @@ function FormView({
 }
 
 function ProgressView({ steps }: { steps: ProgressStep[] }) {
+  const doneCount = steps.filter(s => s.status === 'done').length;
+  const progress = Math.round((doneCount / steps.length) * 100);
+
   return (
     <div style={{ padding: '20px 0' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -396,7 +463,7 @@ function ProgressView({ steps }: { steps: ProgressStep[] }) {
         <div
           style={{
             height: '100%',
-            width: '60%',
+            width: `${progress}%`,
             background: 'var(--ember)',
             borderRadius: 2,
             transition: 'width 500ms ease',
@@ -407,7 +474,7 @@ function ProgressView({ steps }: { steps: ProgressStep[] }) {
   );
 }
 
-function SuccessView({ address, onClose }: { address: string; onClose: () => void }) {
+function SuccessView({ address, privateKey, onClose }: { address: string; privateKey: string; onClose: () => void }) {
   return (
     <div style={{ padding: '20px 0', textAlign: 'center' }}>
       <div
@@ -470,9 +537,26 @@ function SuccessView({ address, onClose }: { address: string; onClose: () => voi
             fontFamily: "'Crimson Pro', serif",
             fontSize: 13,
             color: 'var(--parchment)',
+            marginBottom: 8,
           }}
         >
           This private key cannot be recovered. Store it safely before closing this window.
+        </div>
+        <div
+          className="font-mono"
+          style={{
+            fontSize: 11,
+            color: 'var(--parchment-dim)',
+            background: 'var(--void)',
+            padding: '6px 10px',
+            borderRadius: 2,
+            wordBreak: 'break-all',
+            cursor: 'pointer',
+          }}
+          onClick={() => navigator.clipboard?.writeText(privateKey)}
+          title="Click to copy"
+        >
+          {privateKey}
         </div>
       </div>
 
