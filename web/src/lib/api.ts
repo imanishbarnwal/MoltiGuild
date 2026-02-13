@@ -56,6 +56,9 @@ export interface MissionData {
   budget?: string;
   claimed?: boolean;
   claimer?: string | null;
+  completed?: boolean;
+  rated?: boolean;
+  rating?: number;
   taskHash?: string;
   timestamp_?: string;
   transactionHash_?: string;
@@ -123,6 +126,11 @@ export const fetchOnlineAgents = () =>
 export const fetchOpenMissions = (guildId?: number) =>
   apiFetch<{ count: number; missions: MissionData[] }>(
     `/api/missions/open${guildId != null ? `?guildId=${guildId}` : ''}`,
+  );
+
+export const fetchMissionsByGuild = (guildId: number) =>
+  apiFetch<{ count: number; missions: MissionData[] }>(
+    `/api/guilds/${guildId}/missions`,
   );
 
 export const fetchMissionResult = (missionId: number) =>

@@ -9,7 +9,7 @@ import { subscribeSSE, sseToFeedEvent, type SSEEvent } from './sse';
 import type { FeedEvent, GuildVisual } from './world-state';
 import { getGuildTier, getGuildPosition } from './world-state';
 import {
-  MOCK_STATS, MOCK_GUILDS, MOCK_FEED, MOCK_WALLET,
+  MOCK_GUILDS, MOCK_WALLET,
 } from './mock-data';
 
 /* ── User Identity ──────────────────────────────────────────────── */
@@ -45,11 +45,11 @@ export function useStats() {
     queryFn: api.fetchStatus,
     refetchInterval: 15_000,
     placeholderData: {
-      guilds: MOCK_STATS.totalGuilds,
-      missionsCreated: MOCK_STATS.totalMissions,
-      missionsCompleted: MOCK_STATS.totalMissions - 1,
-      agents: MOCK_STATS.totalAgents,
-      onlineAgents: 2,
+      guilds: 0,
+      missionsCreated: 0,
+      missionsCompleted: 0,
+      agents: 0,
+      onlineAgents: 0,
     },
   });
 }
@@ -133,7 +133,7 @@ export function useMissionsByGuild(guildId: number | null) {
   return useQuery({
     queryKey: ['missions', guildId],
     queryFn: async () => {
-      const res = await api.fetchOpenMissions(guildId!);
+      const res = await api.fetchMissionsByGuild(guildId!);
       return res.missions;
     },
     enabled: guildId != null,
@@ -155,7 +155,7 @@ export function useMissionResult(missionId: number | null) {
 /* ── SSE Feed ───────────────────────────────────────────────────── */
 
 export function useSSEFeed(maxItems = 20) {
-  const [feed, setFeed] = useState<FeedEvent[]>(MOCK_FEED);
+  const [feed, setFeed] = useState<FeedEvent[]>([]);
   const queryClient = useQueryClient();
 
   useEffect(() => {

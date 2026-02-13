@@ -4,6 +4,8 @@
 #   docker compose up api              # API only (lightweight)
 #   docker compose up api tg-bot       # API + Telegram bot
 #   docker compose --profile full up   # API + OpenClaw (conversational AI)
+#   docker compose --profile agents up # API + Agent Fleet (all seeded agents live)
+#   docker compose --profile full --profile agents up  # API + OpenClaw + Agents
 #   docker compose --profile full --profile local-ai up  # + self-hosted Ollama
 #
 # The API is always required. Everything else is optional.
@@ -72,6 +74,28 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    restart: unless-stopped
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+
+  # ═══════════════════════════════════════
+  # AGENT FLEET (all seeded agents, live)
+  # Runs all agents from seeder-state.json in a single process.
+  # Requires: SEEDER_MNEMONIC in .env + data/seeder-state.json
+  # ═══════════════════════════════════════
+  agent-fleet:
+    profiles: ["agents"]
+    build:
+      context: ..
+      dockerfile: deploy/agent-fleet/Dockerfile
+    container_name: moltiguild-agent-fleet
+    env_file:
+      - ../.env
+    environment:
+      - API_URL=https://moltiguild-api.onrender.com
+    volumes:
+      - ../data:/app/data    # seeder-state.json shared with host
     restart: unless-stopped
     dns:
       - 8.8.8.8

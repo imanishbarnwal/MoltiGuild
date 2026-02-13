@@ -7,7 +7,7 @@ export const EXPLORER_URL = 'https://testnet.monadvision.com';
 // In prod, use the full URL directly.
 export const API_BASE_URL = process.env.NODE_ENV === 'development'
   ? ''
-  : (process.env.NEXT_PUBLIC_API_URL || 'https://moltiguild.onrender.com');
+  : (process.env.NEXT_PUBLIC_API_URL || 'https://moltiguild-api.onrender.com');
 
 // Local API URL for Next.js rewrites proxy target (used in next.config.mjs via env)
 // Set NEXT_PUBLIC_API_URL=http://localhost:3001 when running Docker locally.

@@ -181,10 +181,12 @@ export default function GuildCard({ guild, onClose, onNewQuest, onAddAgent }: Gu
                   <span
                     style={{
                       fontSize: 11,
-                      color: m.claimed ? 'var(--verdigris)' : 'var(--ember)',
+                      color: m.completed ? 'var(--gold)' : m.claimed ? 'var(--verdigris)' : 'var(--ember)',
                     }}
                   >
-                    {m.claimed ? 'Claimed' : 'Open'}
+                    {m.completed
+                      ? m.rated ? `Done ★${m.rating}` : 'Done'
+                      : m.claimed ? 'Claimed' : 'Open'}
                   </span>
                 </div>
                 <div

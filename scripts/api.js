@@ -1244,6 +1244,39 @@ app.get('/api/guilds/:id/agents', async (req, res) => {
     }
 });
 
+// GET /api/guilds/:id/missions - All missions for a guild with completion status
+app.get('/api/guilds/:id/missions', async (req, res) => {
+    try {
+        const guildId = parseInt(req.params.id);
+        const missions = await monad.getMissionsByGuild(guildId);
+
+        // Enrich with completion + rating data from Goldsky
+        let completedIds = new Set();
+        let ratedMap = {};
+        try {
+            const data = await monad.queryGoldsky(`{
+                missionCompleteds(first: 1000) { missionId }
+                missionRateds(first: 1000) { missionId score }
+            }`);
+            completedIds = new Set(data.missionCompleteds.map(m => m.missionId));
+            for (const r of data.missionRateds) {
+                ratedMap[r.missionId] = Number(r.score);
+            }
+        } catch {}
+
+        const enriched = missions.map(m => ({
+            ...m,
+            completed: completedIds.has(m.missionId),
+            rated: m.missionId in ratedMap,
+            rating: ratedMap[m.missionId] || null,
+        }));
+
+        res.json({ ok: true, data: { count: enriched.length, missions: enriched } });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
 // GET /api/balance/:address - v4 user deposit balance
 app.get('/api/balance/:address', async (req, res) => {
     try {
