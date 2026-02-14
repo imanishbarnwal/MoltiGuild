@@ -289,10 +289,10 @@ async function queryGoldsky(query, variables = {}) {
 async function getStatus() {
     try {
         const data = await queryGoldsky(`{
-            guildCreateds { id }
-            missionCreateds { id }
-            missionCompleteds { id }
-            agentRegistereds { id }
+            guildCreateds(first: 1000) { id }
+            missionCreateds(first: 1000) { id }
+            missionCompleteds(first: 1000) { id }
+            agentRegistereds(first: 1000) { id }
         }`);
 
         return {
@@ -320,16 +320,16 @@ async function getGuildInfo(guildId) {
     try {
         const data = await queryGoldsky(`
             query GetGuildDashboard($guildId: BigInt!) {
-                guildCreateds(where: { guildId: $guildId }) {
+                guildCreateds(where: { guildId: $guildId }, first: 1) {
                     id guildId name category creator timestamp_ transactionHash_
                 }
-                missionCreateds(where: { guildId: $guildId }) {
+                missionCreateds(where: { guildId: $guildId }, first: 1000) {
                     id missionId client guildId taskHash budget timestamp_
                 }
-                missionCompleteds(where: { guildId: $guildId }) {
+                missionCompleteds(where: { guildId: $guildId }, first: 1000) {
                     id missionId resultHashes timestamp_
                 }
-                missionRateds(where: { guildId: $guildId }) {
+                missionRateds(where: { guildId: $guildId }, first: 1000) {
                     id missionId score timestamp_
                 }
             }
@@ -383,7 +383,7 @@ async function getGuildsByCategory(category) {
     try {
         const data = await queryGoldsky(`
             query GetGuildsByCategory($category: String!) {
-                guildCreateds(where: { category: $category }, orderBy: timestamp_, orderDirection: desc) {
+                guildCreateds(where: { category: $category }, orderBy: timestamp_, orderDirection: desc, first: 1000) {
                     id guildId name category creator timestamp_
                 }
             }
@@ -412,7 +412,7 @@ async function getGuildLeaderboard() {
 
     try {
         const data = await queryGoldsky(`{
-            guildCreateds(orderBy: timestamp_, orderDirection: asc) {
+            guildCreateds(orderBy: timestamp_, orderDirection: asc, first: 1000) {
                 id guildId name category creator timestamp_
             }
         }`);
@@ -490,7 +490,7 @@ async function getMissionsByGuild(guildId) {
     try {
         const data = await queryGoldsky(`
             query GetMissionsByGuild($guildId: BigInt!) {
-                missionCreateds(where: { guildId: $guildId }, orderBy: timestamp_, orderDirection: desc) {
+                missionCreateds(where: { guildId: $guildId }, orderBy: timestamp_, orderDirection: desc, first: 1000) {
                     id missionId guildId client taskHash timestamp_ transactionHash_
                 }
             }
@@ -546,7 +546,7 @@ async function getRecentActivity() {
 async function getAgents() {
     try {
         const data = await queryGoldsky(`{
-            agentRegistereds(first: 100, orderBy: timestamp_, orderDirection: desc) {
+            agentRegistereds(first: 1000, orderBy: timestamp_, orderDirection: desc) {
                 id wallet capability priceWei timestamp_ transactionHash_
             }
         }`);
