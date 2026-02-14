@@ -1,7 +1,11 @@
 'use client';
 
-import { useStats, useCredits, useSSEFeed, useOnlineAgents } from '@/lib/hooks';
-import { timeAgo } from '@/lib/utils';
+import { useState } from 'react';
+import { useStats, useCredits, useSSEFeed, useOnlineAgents, useUser, useContractBalance, useDepositFunds, useWithdrawFunds } from '@/lib/hooks';
+import { timeAgo, truncateAddress } from '@/lib/utils';
+import { formatEther } from 'viem';
+import { EXPLORER_URL } from '@/lib/constants';
+import type { FeedEvent } from '@/lib/world-state';
 
 interface StatsSidebarProps {
   open: boolean;
@@ -11,22 +15,41 @@ const FEED_COLORS: Record<string, string> = {
   mission_completed: 'var(--verdigris)',
   mission_rated: 'var(--gold)',
   mission_created: 'var(--ember)',
+  mission_claimed: 'var(--indigo)',
   guild_created: 'var(--plum)',
   agent_registered: 'var(--indigo)',
 };
 
-const FEED_LABELS: Record<string, (e: { missionId?: number; guildId: number; score?: number }) => string> = {
-  mission_completed: e => `Mission #${e.missionId} done`,
-  mission_rated: e => `Rating ${'★'.repeat(e.score || 0)} #${e.missionId}`,
-  mission_created: e => `Mission #${e.missionId} created`,
-  guild_created: e => `Guild #${e.guildId} founded`,
-  agent_registered: e => `Agent joined guild #${e.guildId}`,
-};
+function feedLabel(e: FeedEvent): string {
+  switch (e.type) {
+    case 'mission_completed':
+      return e.paid
+        ? `Mission #${e.missionId} done \u2014 ${e.paid} MON`
+        : `Mission #${e.missionId} done`;
+    case 'mission_rated':
+      return `Rating ${'★'.repeat(e.score || 0)} #${e.missionId}`;
+    case 'mission_created':
+      return e.budget
+        ? `Mission #${e.missionId} \u2014 ${e.budget} MON`
+        : `Mission #${e.missionId} created`;
+    case 'mission_claimed':
+      return e.agent
+        ? `Agent ${truncateAddress(e.agent)} claimed #${e.missionId}`
+        : `Mission #${e.missionId} claimed`;
+    case 'guild_created':
+      return `Guild #${e.guildId} founded`;
+    case 'agent_registered':
+      return `Agent joined guild #${e.guildId}`;
+    default:
+      return e.type;
+  }
+}
 
 export default function StatsSidebar({ open }: StatsSidebarProps) {
   const { data: stats } = useStats();
   const { data: credits } = useCredits();
   const { data: onlineAgents } = useOnlineAgents();
+  const { isWallet } = useUser();
   const feed = useSSEFeed();
 
   const onlineCount = onlineAgents?.length ?? 0;
@@ -69,8 +92,7 @@ export default function StatsSidebar({ open }: StatsSidebarProps) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {feed.map((event, i) => {
           const color = FEED_COLORS[event.type] || 'var(--parchment-dim)';
-          const labelFn = FEED_LABELS[event.type];
-          const label = labelFn ? labelFn(event) : event.type;
+          const label = feedLabel(event);
 
           return (
             <div
@@ -112,6 +134,18 @@ export default function StatsSidebar({ open }: StatsSidebarProps) {
       {/* YOUR PURSE */}
       <div className="section-header" style={{ marginTop: 8 }}>Your Purse</div>
 
+      {/* API Credits */}
+      <div
+        style={{
+          fontFamily: "'Crimson Pro', serif",
+          fontSize: 12,
+          color: 'var(--parchment-dim)',
+          letterSpacing: '0.06em',
+          marginBottom: 2,
+        }}
+      >
+        API CREDITS
+      </div>
       <div
         className="font-mono"
         style={{
@@ -119,7 +153,7 @@ export default function StatsSidebar({ open }: StatsSidebarProps) {
           fontWeight: 500,
           color: 'var(--gold)',
           textShadow: '0 0 8px var(--glow-gold)',
-          padding: '4px 0',
+          padding: '2px 0',
         }}
       >
         &#x2B21; {balance} MON
@@ -130,10 +164,189 @@ export default function StatsSidebar({ open }: StatsSidebarProps) {
           fontSize: 13,
           color: 'var(--parchment-dim)',
           fontStyle: 'italic',
+          marginBottom: 8,
         }}
       >
         ~{missionsRemaining} missions remaining
       </div>
+
+      {/* On-Chain Balance */}
+      {isWallet ? (
+        <OnChainWallet />
+      ) : (
+        <div
+          style={{
+            fontFamily: "'Crimson Pro', serif",
+            fontSize: 13,
+            color: 'var(--parchment-dim)',
+            fontStyle: 'italic',
+            borderTop: '1px solid var(--walnut-border)',
+            paddingTop: 8,
+          }}
+        >
+          Connect wallet for on-chain operations
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── On-Chain Wallet Controls ─────────────────────────────────────── */
+
+function OnChainWallet() {
+  const { data: rawBalance } = useContractBalance();
+  const depositHook = useDepositFunds();
+  const withdrawHook = useWithdrawFunds();
+
+  const [mode, setMode] = useState<'idle' | 'deposit' | 'withdraw'>('idle');
+  const [amount, setAmount] = useState('');
+
+  const contractBalance = rawBalance != null ? formatEther(rawBalance as bigint) : '0';
+
+  const handleConfirm = () => {
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) return;
+    if (mode === 'deposit') {
+      depositHook.deposit(amount);
+    } else if (mode === 'withdraw') {
+      withdrawHook.withdraw(amount);
+    }
+    setAmount('');
+    setMode('idle');
+  };
+
+  const isPending = depositHook.isPending || withdrawHook.isPending;
+  const isConfirming = depositHook.isConfirming || withdrawHook.isConfirming;
+  const isSuccess = depositHook.isSuccess || withdrawHook.isSuccess;
+  const txHash = depositHook.hash || withdrawHook.hash;
+  const txError = depositHook.error || withdrawHook.error;
+
+  return (
+    <div style={{ borderTop: '1px solid var(--walnut-border)', paddingTop: 8 }}>
+      <div
+        style={{
+          fontFamily: "'Crimson Pro', serif",
+          fontSize: 12,
+          color: 'var(--parchment-dim)',
+          letterSpacing: '0.06em',
+          marginBottom: 2,
+        }}
+      >
+        ON-CHAIN BALANCE
+      </div>
+      <div
+        className="font-mono"
+        style={{
+          fontSize: 16,
+          fontWeight: 500,
+          color: 'var(--verdigris)',
+          textShadow: '0 0 6px rgba(0, 180, 160, 0.3)',
+          padding: '2px 0',
+          marginBottom: 6,
+        }}
+      >
+        &#x2B21; {Number(contractBalance).toFixed(4)} MON
+      </div>
+
+      {/* Action buttons */}
+      {mode === 'idle' && (
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            className="btn-solid"
+            style={{ flex: 1, fontSize: 12, padding: '4px 8px' }}
+            onClick={() => setMode('deposit')}
+            disabled={isPending || isConfirming}
+          >
+            Deposit
+          </button>
+          <button
+            className="btn-solid"
+            style={{ flex: 1, fontSize: 12, padding: '4px 8px' }}
+            onClick={() => setMode('withdraw')}
+            disabled={isPending || isConfirming}
+          >
+            Withdraw
+          </button>
+        </div>
+      )}
+
+      {/* Inline amount input */}
+      {(mode === 'deposit' || mode === 'withdraw') && (
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <input
+            className="input-field"
+            type="text"
+            placeholder="0.01"
+            value={amount}
+            onChange={e => setAmount(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleConfirm(); }}
+            style={{ flex: 1, fontSize: 13, padding: '4px 8px' }}
+            autoFocus
+          />
+          <button
+            className="btn-solid"
+            style={{ fontSize: 12, padding: '4px 10px' }}
+            onClick={handleConfirm}
+          >
+            {mode === 'deposit' ? 'Deposit' : 'Withdraw'}
+          </button>
+          <button
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--parchment-dim)',
+              cursor: 'pointer',
+              fontSize: 14,
+              padding: '2px 4px',
+            }}
+            onClick={() => { setMode('idle'); setAmount(''); }}
+          >
+            &#10005;
+          </button>
+        </div>
+      )}
+
+      {/* Tx status */}
+      {isPending && (
+        <TxStatus color="var(--gold)" text="Confirm in wallet..." />
+      )}
+      {isConfirming && (
+        <TxStatus color="var(--ember)" text="Confirming on-chain..." />
+      )}
+      {isSuccess && txHash && (
+        <TxStatus color="var(--verdigris)">
+          Confirmed{' '}
+          <a
+            href={`${EXPLORER_URL}/tx/${txHash}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-mono"
+            style={{ color: 'var(--indigo)', fontSize: 11 }}
+          >
+            View tx
+          </a>
+        </TxStatus>
+      )}
+      {txError && (
+        <TxStatus color="#f87171" text={txError instanceof Error ? txError.message : 'Transaction failed'} />
+      )}
+    </div>
+  );
+}
+
+/* ── Helpers ──────────────────────────────────────────────────────── */
+
+function TxStatus({ color, text, children }: { color: string; text?: string; children?: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        fontFamily: "'Crimson Pro', serif",
+        fontSize: 12,
+        color,
+        marginTop: 4,
+        animation: 'coinPulse 2s ease-in-out infinite',
+      }}
+    >
+      {text ?? children}
     </div>
   );
 }

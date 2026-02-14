@@ -8,7 +8,6 @@ import { MinimapManager } from './MinimapManager';
 import { TreeManager } from './TreeManager';
 import { CinematicIntro, SKIP_INTRO } from './CinematicIntro';
 import { WorldState } from '@/lib/world-state';
-import { BIOME_CONFIG } from './BiomeConfig';
 import { seededRng } from './noise';
 
 /** Number of tile variants per biome / terrain type. */
@@ -194,7 +193,6 @@ export class WorldScene extends Phaser.Scene {
     if (this.debugEl && this.tilemapManager) {
       const pointer = this.input.activePointer;
       const cell = this.tilemapManager.screenToGrid(pointer.worldX, pointer.worldY);
-      const tsCenter = this.tilemapManager.townSquareCenterScreen;
 
       if (cell) {
         const key = `${cell.col},${cell.row}`;
@@ -483,6 +481,9 @@ export class WorldScene extends Phaser.Scene {
       groupCenters.push(tile);
     }
 
+    // Tiles to exclude from mountain peak placement
+    const excluded = new Set(['51,43']);
+
     // For each group center, place a dense cluster of 5–7 peaks on nearby tiles
     const placed = new Set<string>();
     for (const center of groupCenters) {
@@ -499,6 +500,7 @@ export class WorldScene extends Phaser.Scene {
           const k = `${c},${r}`;
           if (!tileSet.has(k)) continue;
           if (placed.has(k)) continue;
+          if (excluded.has(k)) continue;
           if (this.tilemapManager.isWater(c, r)) continue;
           if (this.tilemapManager.isRoad(c, r)) continue;
           candidates.push({ col: c, row: r });
@@ -663,8 +665,6 @@ export class WorldScene extends Phaser.Scene {
     const tileSet = new Set(tiles);
     const bounds = this.tilemapManager.getDistrictBounds('research');
     if (!bounds) return;
-    const cx = bounds.centerCol;
-    const cy = bounds.centerRow;
 
     // Collect edge tiles: boundary tiles (within 2 tiles of district boundary)
     const edgeTiles: { col: number; row: number }[] = [];
@@ -760,10 +760,6 @@ export class WorldScene extends Phaser.Scene {
     if (!tiles || tiles.size === 0) return;
 
     const tileSet = new Set(tiles);
-    const tileArr = Array.from(tiles).map(k => {
-      const [c, r] = k.split(',').map(Number);
-      return { col: c, row: r };
-    });
 
     // Collect top-edge tiles: boundary tiles in the upper half of the district
     const creativeBounds = this.tilemapManager.getDistrictBounds('creative');
@@ -910,6 +906,16 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
+  /** Trigger spawn animation for a newly assigned guild hall. */
+  onPlotAssigned(guildId: number): void {
+    this.guildHallManager?.animateSpawn(guildId);
+  }
+
+  /** Trigger departure animation for a released guild hall. */
+  onPlotReleased(guildId: number): void {
+    this.guildHallManager?.animateDeparture(guildId);
+  }
+
   /** Enable/disable building hover + click interactivity (district view only). */
   setBuildingsInteractive(enabled: boolean): void {
     // Guild halls are the main interactive buildings
@@ -932,8 +938,7 @@ export class WorldScene extends Phaser.Scene {
         { guildHallMgr: !!this.guildHallManager, buildingMgr: !!this.buildingManager });
       return;
     }
-    console.log('[WorldScene] updateWorldState',
-      { guilds: worldState.guilds.length, agents: worldState.agents.length });
+    // console.log('[WorldScene] updateWorldState', { guilds: worldState.guilds.length, agents: worldState.agents.length });
     // Place/update guild hall buildings (1 per guild)
     this.guildHallManager.updateGuildHalls(worldState.guilds);
     // Place/update per-agent buildings (tier-based)

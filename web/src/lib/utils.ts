@@ -22,6 +22,16 @@ export function renderStars(rating: number, max = 5): string {
   return '\u2605'.repeat(full) + '\u2606'.repeat(empty);
 }
 
+/** Structured content block from OpenClaw responses. */
+export interface ContentBlock {
+  type: 'text' | 'tool_use' | 'tool_result';
+  text?: string;
+  toolName?: string;
+  toolInput?: Record<string, unknown>;
+  toolResult?: unknown;
+  toolId?: string;
+}
+
 /** Chat message structure for ChatBar. */
 export interface ChatMessage {
   id: number;
@@ -31,4 +41,5 @@ export interface ChatMessage {
   rating?: number;
   missionId?: number;
   timestamp: number;
+  blocks?: ContentBlock[];
 }

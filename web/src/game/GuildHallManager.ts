@@ -2,7 +2,6 @@ import * as Phaser from 'phaser';
 import { TilemapManager } from './TilemapManager';
 import { TreeManager } from './TreeManager';
 import type { GuildVisual } from '@/lib/world-state';
-import { categoryToDistrict } from '@/lib/world-state';
 
 /* ── Guild tier → building visual config ─────────────────────────── */
 
@@ -49,7 +48,6 @@ interface PlacedGuildHall {
   guildId: number;
   tier: string;
   sprite: Phaser.GameObjects.Image;
-  shadow: Phaser.GameObjects.Image;
   label: Phaser.GameObjects.Text | null;
   aura: Phaser.GameObjects.Particles.ParticleEmitter | null;
   col: number;
@@ -57,7 +55,7 @@ interface PlacedGuildHall {
   footprint: number;
 }
 
-/* ── Simple seeded RNG for deterministic placement ───────────────── */
+/* ── Simple seeded RNG for deterministic sprite picking ────────── */
 
 function seededRng(seed: number) {
   let s = seed;
@@ -83,14 +81,14 @@ export class GuildHallManager {
 
   /**
    * Sync guild halls with live guild data.
-   * Adds new guilds, upgrades tiers, removes dissolved guilds.
+   * Only places guilds that have server-authoritative assignedPlot coordinates.
    */
   updateGuildHalls(guilds: GuildVisual[]): void {
     if (!this.tilemapManager) {
       console.warn('[GuildHallManager] updateGuildHalls skipped — no tilemapManager');
       return;
     }
-    console.log('[GuildHallManager] updateGuildHalls', { count: guilds.length, existing: this.halls.length });
+    // console.log('[GuildHallManager] updateGuildHalls', { count: guilds.length, existing: this.halls.length });
 
     const activeIds = new Set(guilds.map(g => g.guildId));
 
@@ -106,8 +104,10 @@ export class GuildHallManager {
       const existing = this.halls.find(h => h.guildId === guild.guildId);
 
       if (existing) {
-        // Upgrade if tier changed
-        if (existing.tier !== guild.tier) {
+        // Upgrade if tier changed or plot coordinates changed
+        const plotChanged = guild.assignedPlot &&
+          (existing.col !== guild.assignedPlot.col || existing.row !== guild.assignedPlot.row);
+        if (existing.tier !== guild.tier || plotChanged) {
           this.removeHall(existing);
           this.halls = this.halls.filter(h => h !== existing);
           this.placeHall(guild);
@@ -121,50 +121,48 @@ export class GuildHallManager {
   private placeHall(guild: GuildVisual): void {
     if (!this.tilemapManager) return;
 
-    const config = GUILD_TIER_CONFIG[guild.tier] ?? GUILD_TIER_CONFIG.bronze;
-    const districtCategory = categoryToDistrict(guild.category);
-
-    // Find spot using deterministic seed from guildId
-    const spot = this.findDeterministicSpot(guild.guildId, districtCategory, config.footprint);
-    if (!spot) {
-      console.warn('[GuildHallManager] No spot found for guild', guild.guildId, guild.name, 'in', districtCategory);
-      return;
+    // Server-authoritative: only place guilds that have an assigned plot
+    if (guild.assignedPlot) {
+      this.placeAtServerCoords(guild, guild.assignedPlot.col, guild.assignedPlot.row);
     }
-    console.log('[GuildHallManager] Placing guild', guild.guildId, guild.name, 'at', spot.col, spot.row, 'tier:', guild.tier);
+    // No server assignment — skip. Guilds appear once assigned via world governance.
+    // The guild list panel shows all guilds regardless of plot status.
+  }
+
+  /**
+   * Place a guild hall at server-specified coordinates.
+   */
+  private placeAtServerCoords(guild: GuildVisual, col: number, row: number): void {
+    if (!this.tilemapManager) return;
+
+    const config = GUILD_TIER_CONFIG[guild.tier] ?? GUILD_TIER_CONFIG.bronze;
+
+    // console.log('[GuildHallManager] Placing guild', guild.guildId, guild.name, 'at', col, row, 'tier:', guild.tier, '(server)');
 
     // Occupy tiles
     for (let dy = 0; dy < config.footprint; dy++) {
       for (let dx = 0; dx < config.footprint; dx++) {
-        this.tilemapManager.occupyTile(spot.col + dx, spot.row + dy, `guild-${guild.guildId}`, guild.tier);
+        this.tilemapManager.occupyTile(col + dx, row + dy, `guild-${guild.guildId}`, guild.tier);
       }
     }
 
-    // Clear trees for 2x2 buildings
-    if (config.footprint === 2 && this.treeManager) {
-      this.treeManager.clearTilesForBuilding(spot.col, spot.row, config.footprint);
+    // Clear trees for ALL building sizes
+    if (this.treeManager) {
+      this.treeManager.clearTilesForBuilding(col, row, config.footprint);
     }
 
     // Calculate screen position
-    const centerCol = spot.col + (config.footprint - 1) * 0.5;
-    const centerRow = spot.row + (config.footprint - 1) * 0.5;
+    const centerCol = col + (config.footprint - 1) * 0.5;
+    const centerRow = row + (config.footprint - 1) * 0.5;
     const pos = this.tilemapManager.gridToScreen(centerCol, centerRow);
 
     // Pick sprite deterministically
     const rand = seededRng(guild.guildId * 7919);
     const spriteKey = config.sprites[Math.floor(rand() * config.sprites.length)];
 
-    // Shadow
-    const shadow = this.scene.add.image(pos.x + 4, pos.y + 6, 'building-shadow');
-    shadow.setOrigin(0.5, 0.5);
-    shadow.setScale(
-      config.scale * (config.footprint === 2 ? 2.2 : 1.8),
-      config.scale * (config.footprint === 2 ? 1.4 : 1.2),
-    );
-    shadow.setDepth(0.5);
-
     // Building sprite
     const sprite = this.scene.add.image(pos.x, pos.y, spriteKey);
-    sprite.setOrigin(0.5, 0.85);
+    sprite.setOrigin(0.5, 0.95);
     sprite.setScale(config.scale);
     sprite.setDepth(7 + (centerCol + centerRow) * 0.01);
 
@@ -271,19 +269,54 @@ export class GuildHallManager {
       guildId: guild.guildId,
       tier: guild.tier,
       sprite,
-      shadow,
       label: null,
       aura,
-      col: spot.col,
-      row: spot.row,
+      col,
+      row,
       footprint: config.footprint,
+    });
+  }
+
+  /**
+   * Animate a new guild hall spawning (called on SSE plot_assigned).
+   */
+  animateSpawn(guildId: number): void {
+    const hall = this.halls.find(h => h.guildId === guildId);
+    if (!hall) return;
+
+    hall.sprite.setScale(0);
+    this.scene.tweens.add({
+      targets: hall.sprite,
+      scaleX: GUILD_TIER_CONFIG[hall.tier]?.scale ?? 0.55,
+      scaleY: GUILD_TIER_CONFIG[hall.tier]?.scale ?? 0.55,
+      duration: 500,
+      ease: 'Back.easeOut',
+    });
+  }
+
+  /**
+   * Animate a guild hall departing (called on SSE plot_released).
+   */
+  animateDeparture(guildId: number): void {
+    const hall = this.halls.find(h => h.guildId === guildId);
+    if (!hall) return;
+
+    this.scene.tweens.add({
+      targets: hall.sprite,
+      y: hall.sprite.y - 30,
+      alpha: 0,
+      duration: 600,
+      ease: 'Cubic.easeIn',
+      onComplete: () => {
+        this.removeHall(hall);
+        this.halls = this.halls.filter(h => h !== hall);
+      },
     });
   }
 
   private removeHall(hall: PlacedGuildHall): void {
     if (!this.tilemapManager) return;
 
-    // Clear tile occupation
     for (let dy = 0; dy < hall.footprint; dy++) {
       for (let dx = 0; dx < hall.footprint; dx++) {
         this.tilemapManager.clearOccupation(hall.col + dx, hall.row + dy);
@@ -291,61 +324,8 @@ export class GuildHallManager {
     }
 
     hall.sprite.destroy();
-    hall.shadow.destroy();
     hall.label?.destroy();
     hall.aura?.destroy();
-  }
-
-  /**
-   * Find a spot in a district using a deterministic seed.
-   * Same guildId always gets the same tile (stable across renders).
-   */
-  private findDeterministicSpot(
-    guildId: number,
-    category: string,
-    footprint: number,
-  ): { col: number; row: number } | null {
-    if (!this.tilemapManager) return null;
-
-    const tiles = this.tilemapManager.getDistrictTiles(category);
-    if (!tiles || tiles.size === 0) return null;
-
-    // Convert to array and sort for determinism
-    const tileArr = Array.from(tiles).map(k => {
-      const [c, r] = k.split(',').map(Number);
-      return { col: c, row: r };
-    }).sort((a, b) => a.col - b.col || a.row - b.row);
-
-    // Use seeded shuffle based on guildId
-    const rand = seededRng(guildId * 31337);
-    const shuffled = [...tileArr];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(rand() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-
-    for (const tile of shuffled) {
-      if (this.canPlace(tile.col, tile.row, footprint, category)) {
-        return tile;
-      }
-    }
-    return null;
-  }
-
-  private canPlace(col: number, row: number, footprint: number, category: string): boolean {
-    if (!this.tilemapManager) return false;
-
-    for (let dy = 0; dy < footprint; dy++) {
-      for (let dx = 0; dx < footprint; dx++) {
-        const c = col + dx;
-        const r = row + dy;
-        if (this.tilemapManager.isOccupied(c, r)) return false;
-        if (this.tilemapManager.isRoad(c, r)) return false;
-        if (this.tilemapManager.isWater(c, r)) return false;
-        if (footprint > 1 && this.tilemapManager.getTileDistrict(c, r) !== category) return false;
-      }
-    }
-    return true;
   }
 
   /** Enable/disable interactivity on guild buildings. */
@@ -359,7 +339,6 @@ export class GuildHallManager {
   destroy(): void {
     for (const h of this.halls) {
       h.sprite.destroy();
-      h.shadow.destroy();
       h.label?.destroy();
       h.aura?.destroy();
     }

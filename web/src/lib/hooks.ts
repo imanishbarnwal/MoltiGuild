@@ -2,12 +2,14 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
-import { useAccount } from 'wagmi';
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { parseEther } from 'viem';
 import * as api from './api';
 import { getUserId } from './user';
 import { subscribeSSE, sseToFeedEvent, type SSEEvent } from './sse';
 import type { FeedEvent, GuildVisual } from './world-state';
 import { getGuildTier, getGuildPosition } from './world-state';
+import { guildRegistryConfig } from './contract';
 
 /* ── User Identity ──────────────────────────────────────────────── */
 
@@ -238,4 +240,67 @@ export function useCreateGuild() {
       queryClient.invalidateQueries({ queryKey: ['status'] });
     },
   });
+}
+
+/* ── On-Chain Contract Hooks ──────────────────────────────────────── */
+
+export function useContractBalance() {
+  const { address } = useAccount();
+  return useReadContract({
+    ...guildRegistryConfig,
+    functionName: 'userBalances',
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address,
+      refetchInterval: 15_000,
+    },
+  });
+}
+
+export function useDepositFunds() {
+  const { userId } = useUser();
+  const queryClient = useQueryClient();
+  const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  useEffect(() => {
+    if (isSuccess) {
+      queryClient.invalidateQueries({ queryKey: ['credits', userId] });
+      queryClient.invalidateQueries({ queryKey: ['contract-balance'] });
+    }
+  }, [isSuccess, queryClient, userId]);
+
+  const deposit = (amount: string) => {
+    writeContract({
+      ...guildRegistryConfig,
+      functionName: 'depositFunds',
+      value: parseEther(amount),
+    });
+  };
+
+  return { deposit, hash, isPending, isConfirming, isSuccess, error, reset };
+}
+
+export function useWithdrawFunds() {
+  const { userId } = useUser();
+  const queryClient = useQueryClient();
+  const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  useEffect(() => {
+    if (isSuccess) {
+      queryClient.invalidateQueries({ queryKey: ['credits', userId] });
+      queryClient.invalidateQueries({ queryKey: ['contract-balance'] });
+    }
+  }, [isSuccess, queryClient, userId]);
+
+  const withdraw = (amount: string) => {
+    writeContract({
+      ...guildRegistryConfig,
+      functionName: 'withdrawFunds',
+      args: [parseEther(amount)],
+    });
+  };
+
+  return { withdraw, hash, isPending, isConfirming, isSuccess, error, reset };
 }

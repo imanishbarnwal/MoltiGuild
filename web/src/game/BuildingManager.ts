@@ -35,7 +35,6 @@ const TIER_SPRITES: Record<string, string[]> = {
 
 interface PlacedBuilding {
   sprite: Phaser.GameObjects.Image;
-  shadow: Phaser.GameObjects.Image;
   col: number;
   row: number;
   footprint: number;
@@ -126,20 +125,14 @@ export class BuildingManager {
     const sprites = TIER_SPRITES[tier] ?? TIER_SPRITES.tent;
     const key = sprites[Math.floor(Math.random() * sprites.length)];
 
-    // Shadow
-    const shadow = this.scene.add.image(pos.x + 4, pos.y + 6, 'building-shadow');
-    shadow.setOrigin(0.5, 0.5);
-    shadow.setScale(config.scale * (footprint === 2 ? 2.2 : 1.8), config.scale * (footprint === 2 ? 1.4 : 1.2));
-    shadow.setDepth(0.5);
-
     // Building sprite
     const sprite = this.scene.add.image(pos.x, pos.y, key);
-    sprite.setOrigin(0.5, 0.85);
+    sprite.setOrigin(0.5, 0.95);
     sprite.setScale(config.scale);
     sprite.setDepth(7 + (centerCol + centerRow) * 0.01);
 
     this.buildings.push({
-      sprite, shadow,
+      sprite,
       col: spot.col, row: spot.row,
       footprint, owner, tier,
     });
@@ -156,35 +149,41 @@ export class BuildingManager {
     }
 
     building.sprite.destroy();
-    building.shadow.destroy();
   }
 
-  /** Find an unoccupied spot in a district for the given footprint size. */
+  /** Find an unoccupied spot in a district. Uses seeded hash for deterministic, O(1) probing. */
   private findSpot(category: string, footprint: number): { col: number; row: number } | null {
     if (!this.tilemapManager) return null;
 
     const tiles = this.tilemapManager.getDistrictTiles(category);
     if (!tiles) return null;
 
-    // Convert to shuffled array for random placement
-    const tileArr = Array.from(tiles).map(k => {
-      const [c, r] = k.split(',').map(Number);
-      return { col: c, row: r };
-    });
-
-    // Shuffle
-    for (let i = tileArr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [tileArr[i], tileArr[j]] = [tileArr[j], tileArr[i]];
+    // Cache tile arrays per category to avoid repeated Array.from
+    if (!this.tileCache) this.tileCache = new Map();
+    let tileArr = this.tileCache.get(category);
+    if (!tileArr) {
+      tileArr = Array.from(tiles).map(k => {
+        const [c, r] = k.split(',').map(Number);
+        return { col: c, row: r };
+      });
+      this.tileCache.set(category, tileArr);
     }
 
-    for (const tile of tileArr) {
+    // Linear probe from a seeded starting index (avoids full shuffle)
+    const seed = this.buildings.length * 7919 + category.charCodeAt(0) * 31;
+    const start = ((seed >>> 0) % tileArr.length);
+    const len = tileArr.length;
+
+    for (let i = 0; i < len; i++) {
+      const tile = tileArr[(start + i) % len];
       if (this.canPlace(tile.col, tile.row, footprint, category)) {
         return tile;
       }
     }
     return null;
   }
+
+  private tileCache: Map<string, { col: number; row: number }[]> | null = null;
 
   /** Check if a footprint can be placed at (col, row). */
   private canPlace(col: number, row: number, footprint: number, category: string): boolean {
@@ -207,7 +206,6 @@ export class BuildingManager {
   destroy(): void {
     for (const b of this.buildings) {
       b.sprite.destroy();
-      b.shadow.destroy();
     }
     this.buildings = [];
   }

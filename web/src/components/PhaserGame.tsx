@@ -2,15 +2,18 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { WorldState } from '@/lib/world-state';
+import { subscribeSSE } from '@/lib/sse';
 
 interface PhaserGameProps {
   worldState: WorldState | null;
   onGuildClick: (guildId: number) => void;
   onEmptyLotClick: (district: string) => void;
   onDistrictClick?: (info: { name: string; category: string }) => void;
+  onPlotAssigned?: (guildId: number) => void;
+  onPlotReleased?: (guildId: number) => void;
 }
 
-export default function PhaserGame({ worldState, onGuildClick, onEmptyLotClick, onDistrictClick }: PhaserGameProps) {
+export default function PhaserGame({ worldState, onGuildClick, onEmptyLotClick, onDistrictClick, onPlotAssigned: _onPlotAssigned, onPlotReleased: _onPlotReleased }: PhaserGameProps) {
   const gameRef = useRef<{ game: InstanceType<typeof import('phaser').Game> } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [inDistrict, setInDistrict] = useState(false);
@@ -116,6 +119,30 @@ export default function PhaserGame({ worldState, onGuildClick, onEmptyLotClick, 
       (scene as unknown as { updateWorldState: (ws: WorldState) => void }).updateWorldState(worldState);
     }
   }, [worldState]);
+
+  // SSE plot event forwarding to Phaser scene
+  useEffect(() => {
+    if (!gameRef.current || !sceneReadyRef.current) return;
+
+    const unsub = subscribeSSE((sse) => {
+      if (sse.type !== 'plot_assigned' && sse.type !== 'plot_released') return;
+      if (!gameRef.current) return;
+
+      const scene = gameRef.current.game.scene.getScene('WorldScene');
+      if (!scene) return;
+
+      const guildId = Number(sse.data.guildId);
+
+      if (sse.type === 'plot_assigned' && 'onPlotAssigned' in scene) {
+        (scene as unknown as { onPlotAssigned: (id: number) => void }).onPlotAssigned(guildId);
+      }
+      if (sse.type === 'plot_released' && 'onPlotReleased' in scene) {
+        (scene as unknown as { onPlotReleased: (id: number) => void }).onPlotReleased(guildId);
+      }
+    });
+
+    return unsub;
+  }, []);
 
   const handleBackToWorld = (e?: React.MouseEvent) => {
     // Prevent click from leaking to Phaser canvas

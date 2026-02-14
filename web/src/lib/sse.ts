@@ -13,7 +13,9 @@ export type SSEEventType =
   | 'agent_left_guild'
   | 'pipeline_created'
   | 'step_completed'
-  | 'pipeline_completed';
+  | 'pipeline_completed'
+  | 'plot_assigned'
+  | 'plot_released';
 
 export interface SSEEvent {
   type: SSEEventType;
@@ -34,6 +36,7 @@ const EVENT_TYPES: SSEEventType[] = [
   'mission_created', 'mission_completed', 'mission_rated', 'mission_claimed',
   'guild_created', 'agent_joined_guild', 'agent_left_guild',
   'pipeline_created', 'step_completed', 'pipeline_completed',
+  'plot_assigned', 'plot_released',
 ];
 
 export function connectSSE(): void {
@@ -96,6 +99,8 @@ export function sseToFeedEvent(sse: SSEEvent): FeedEvent | null {
         missionId: Number(d.missionId),
         timestamp: now,
         txHash: String(d.txHash || ''),
+        ...(d.paid != null ? { paid: String(d.paid) } : {}),
+        ...(d.agent ? { agent: String(d.agent) } : {}),
       };
     case 'mission_created':
       return {
@@ -104,6 +109,7 @@ export function sseToFeedEvent(sse: SSEEvent): FeedEvent | null {
         missionId: Number(d.missionId),
         timestamp: now,
         txHash: String(d.txHash || ''),
+        ...(d.budget != null ? { budget: String(d.budget) } : {}),
       };
     case 'mission_rated':
       return {
@@ -113,6 +119,15 @@ export function sseToFeedEvent(sse: SSEEvent): FeedEvent | null {
         score: Number(d.score ?? d.rating ?? 0),
         timestamp: now,
         txHash: String(d.txHash || ''),
+      };
+    case 'mission_claimed':
+      return {
+        type: 'mission_claimed',
+        guildId: Number(d.guildId ?? 0),
+        missionId: Number(d.missionId),
+        timestamp: now,
+        txHash: String(d.txHash || ''),
+        ...(d.agent ? { agent: String(d.agent) } : {}),
       };
     case 'guild_created':
       return {
@@ -127,6 +142,28 @@ export function sseToFeedEvent(sse: SSEEvent): FeedEvent | null {
         guildId: Number(d.guildId),
         timestamp: now,
         txHash: String(d.txHash || ''),
+      };
+    case 'plot_assigned':
+      return {
+        type: 'plot_assigned',
+        guildId: Number(d.guildId),
+        timestamp: now,
+        txHash: '',
+        plotId: String(d.plotId || ''),
+        col: Number(d.col),
+        row: Number(d.row),
+        tier: String(d.tier || ''),
+        district: String(d.district || ''),
+      };
+    case 'plot_released':
+      return {
+        type: 'plot_released',
+        guildId: Number(d.guildId),
+        timestamp: now,
+        txHash: '',
+        plotId: String(d.plotId || ''),
+        col: Number(d.col),
+        row: Number(d.row),
       };
     default:
       return null;

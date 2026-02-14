@@ -104,7 +104,8 @@
         "trustedProxies": ["127.0.0.1/8", "172.16.0.0/12", "10.0.0.0/8"],
         "controlUi": {
             "dangerouslyDisableDeviceAuth": true,
-            "allowInsecureAuth": true
+            "allowInsecureAuth": true,
+            "allowedOrigins": ["http://localhost:3000", "http://localhost:3001", "https://moltiguild.vercel.app", "https://moltiguild.netlify.app"]
         },
         "auth": {
             "mode": "token",

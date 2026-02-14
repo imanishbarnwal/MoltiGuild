@@ -41,6 +41,7 @@ const path = require('path');
 const { verifyMessage } = require('viem');
 const monad = require('./monad');
 const { matchGuildForTask } = require('./guild-matcher');
+const worldState = require('./world-state');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
 const app = express();
@@ -68,7 +69,8 @@ const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 const sseClients = new Set();
 
 function broadcast(event, data) {
-    const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+    const enriched = { type: event, ...data };
+    const payload = `event: ${event}\ndata: ${JSON.stringify(enriched)}\n\n`;
     for (const res of sseClients) {
         res.write(payload);
     }
@@ -1228,7 +1230,13 @@ async function getEnrichedGuilds(category) {
 app.get('/api/guilds', async (req, res) => {
     try {
         const enriched = await getEnrichedGuilds(req.query.category);
-        res.json({ ok: true, data: { count: enriched.length, guilds: enriched } });
+        // Attach plot assignments
+        const allPlots = worldState.getAllAssignments();
+        const guildsWithPlots = enriched.map(g => ({
+            ...g,
+            assignedPlot: worldState.getGuildPrimaryPlot(parseInt(g.guildId)) || null,
+        }));
+        res.json({ ok: true, data: { count: guildsWithPlots.length, guilds: guildsWithPlots } });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
     }
@@ -1288,6 +1296,99 @@ app.get('/api/balance/:address', async (req, res) => {
 });
 
 // ═══════════════════════════════════════
+// WORLD GOVERNANCE ENDPOINTS
+// ═══════════════════════════════════════
+
+// GET /api/world/plots - Available plots in a district, scored by desirability
+app.get('/api/world/plots', (req, res) => {
+    try {
+        const { district, tier } = req.query;
+        if (!district) return res.status(400).json({ ok: false, error: 'Missing district query parameter' });
+        const plots = worldState.getAvailablePlots(district, tier || 'bronze');
+        res.json({ ok: true, data: { count: plots.length, district, plots: plots.slice(0, 50) } });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// GET /api/world/districts - District stats
+app.get('/api/world/districts', (req, res) => {
+    try {
+        const stats = worldState.getDistrictStats();
+        res.json({ ok: true, data: stats });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// POST /api/world/plots/:plotId/assign - Assign a plot to a guild
+app.post('/api/world/plots/:plotId/assign', async (req, res) => {
+    try {
+        const { plotId } = req.params;
+        const { guildId, tier } = req.body;
+        if (guildId === undefined || !tier) {
+            return res.status(400).json({ ok: false, error: 'Missing guildId or tier' });
+        }
+        const result = worldState.assignPlot(plotId, parseInt(guildId), tier);
+        if (!result.ok) {
+            return res.status(409).json(result);
+        }
+        await worldState.savePlotAssignments();
+        broadcast('plot_assigned', {
+            guildId: parseInt(guildId),
+            plotId,
+            col: result.assignment.col,
+            row: result.assignment.row,
+            tier,
+            district: result.assignment.district,
+            timestamp: Date.now(),
+        });
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// POST /api/world/plots/:plotId/release - Release a plot
+app.post('/api/world/plots/:plotId/release', async (req, res) => {
+    try {
+        const { plotId } = req.params;
+        const { guildId } = req.body;
+        if (guildId === undefined) {
+            return res.status(400).json({ ok: false, error: 'Missing guildId' });
+        }
+        const result = worldState.releasePlot(plotId, parseInt(guildId));
+        if (!result.ok) {
+            return res.status(409).json(result);
+        }
+        await worldState.savePlotAssignments();
+        const [col, row] = plotId.split(',').map(Number);
+        broadcast('plot_released', {
+            guildId: parseInt(guildId),
+            plotId,
+            col,
+            row,
+            timestamp: Date.now(),
+        });
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// GET /api/world/districts/:id/suggested-plots - Top scored plots for tier
+app.get('/api/world/districts/:id/suggested-plots', (req, res) => {
+    try {
+        const district = req.params.id;
+        const tier = req.query.tier || 'bronze';
+        const plots = worldState.getAvailablePlots(district, tier);
+        res.json({ ok: true, data: { district, tier, suggestions: plots.slice(0, 5) } });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// ═══════════════════════════════════════
 // SSE ENDPOINT
 // ═══════════════════════════════════════
 
@@ -1324,8 +1425,18 @@ app.get('/api/events', (req, res) => {
 // START SERVER
 // ═══════════════════════════════════════
 
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, '0.0.0.0', async () => {
     ensureDataDir();
+    // Initialize world governance (pass Redis adapter if available)
+    try {
+        if (redis) {
+            worldState.setPersistence(redis);
+        }
+        await worldState.init();
+        console.log('World governance initialized');
+    } catch (err) {
+        console.warn('World governance init failed (run export-district-map.js first):', err.message);
+    }
     console.log(`MoltiGuild API (v4) running on port ${PORT}`);
     console.log(`Contract: ${monad.GUILD_REGISTRY_ADDRESS}`);
     console.log(`Endpoints:`);

@@ -15,6 +15,15 @@ export interface District {
   height: number;
 }
 
+export interface PlotAssignment {
+  plotId: string;
+  col: number;
+  row: number;
+  tier: string;
+  district: string;
+  assignedAt: number;
+}
+
 export interface GuildVisual {
   guildId: number;
   name: string;
@@ -26,6 +35,7 @@ export interface GuildVisual {
   agents: AgentVisual[];
   isAnimating: boolean;
   animationType: 'none' | 'construction' | 'fireworks' | 'decay';
+  assignedPlot?: PlotAssignment | null;
 }
 
 export interface AgentVisual {
@@ -39,12 +49,20 @@ export interface AgentVisual {
 }
 
 export interface FeedEvent {
-  type: 'mission_completed' | 'mission_created' | 'mission_rated' | 'guild_created' | 'agent_registered';
+  type: 'mission_completed' | 'mission_created' | 'mission_rated' | 'mission_claimed' | 'guild_created' | 'agent_registered' | 'plot_assigned' | 'plot_released';
   guildId: number;
   missionId?: number;
   score?: number;
+  budget?: string;
+  paid?: string;
+  agent?: string;
   timestamp: number;
   txHash: string;
+  plotId?: string;
+  col?: number;
+  row?: number;
+  tier?: string;
+  district?: string;
 }
 
 export interface GlobalStats {

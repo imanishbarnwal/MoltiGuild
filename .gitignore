@@ -55,8 +55,10 @@ tmp/
 temp/
 nul
 
-# Data files
+# Data files (runtime state)
 data/
+# Static seed data — commit to git (generated once, never changes)
+!data/district-map.json
 
 # Vercel
 .vercel
