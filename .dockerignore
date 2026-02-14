@@ -42,3 +42,4 @@ tmp/
 temp/
 nul
 data/
+!data/district-map.json
