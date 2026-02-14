@@ -8,10 +8,11 @@ WORKDIR /app
 COPY scripts/package.json ./
 RUN npm install --production
 
-COPY scripts/api.js scripts/monad.js scripts/coordinator.js scripts/guild-matcher.js ./
+COPY scripts/api.js scripts/monad.js scripts/coordinator.js scripts/guild-matcher.js scripts/world-state.js ./
 
-# Data directory for persistent state (heartbeats, pipelines)
+# Data directory + static district map (generated once, committed to repo)
 RUN mkdir -p /app/data
+COPY data/district-map.json /app/data/
 ENV DATA_DIR=/app/data
 
 EXPOSE 3001
