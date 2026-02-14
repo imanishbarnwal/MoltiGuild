@@ -32,7 +32,7 @@
     width: 1920px; height: 1080px;
     z-index: 9998;
     pointer-events: none;
-    opacity: 0.04;
+    opacity: 0.018;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
     background-size: 256px 256px;
   }
@@ -147,7 +147,7 @@
     90% { transform: translate(10%,5%); }
     100% { transform: translate(5%,0%); }
   }
-  #grain { animation: grainAnim 0.5s steps(10) infinite; }
+  #grain { animation: grainAnim 1.5s steps(6) infinite; }
 
   .anim-fade-up {
     opacity: 0;
@@ -256,30 +256,32 @@
     color: #836EF9;
   }
   .logo-monad .m-mark {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
     width: 38px; height: 38px;
     border-radius: 8px;
-    background: #836EF9;
-    color: #fff;
-    font-size: 22px;
-    font-weight: 800;
+    object-fit: cover;
   }
   .logo-nadfun {
     font-family: 'IBM Plex Mono', monospace;
-    color: #FF6B4A;
+    color: #836EF9;
   }
   .logo-nadfun .n-mark {
+    width: 38px; height: 38px;
+    border-radius: 8px;
+    object-fit: cover;
+  }
+  .logo-openclaw {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
+    gap: 8px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 700;
+    font-size: 22px;
+    color: #FF3333;
+  }
+  .logo-openclaw .oc-mark {
     width: 38px; height: 38px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #FF6B4A, #FF9A3E);
-    color: #fff;
-    font-size: 18px;
-    font-weight: 800;
+    border-radius: 8px;
+    object-fit: cover;
   }
 
   /* ══════════════════════════════════════════════
@@ -298,6 +300,15 @@
     display: block;
     width: 1200px;
     height: auto;
+  }
+  #scene3 .ui-frame img.s3-overlay {
+    position: absolute;
+    top: 0; left: 0;
+    opacity: 0;
+    transition: opacity 1.2s ease;
+  }
+  #scene3 .ui-frame img.s3-overlay.visible {
+    opacity: 1;
   }
   #scene3 .district-label {
     position: absolute;
@@ -332,19 +343,24 @@
     min-width: 150px;
   }
   #scene4 .tier-item .sprite-wrap {
-    width: 140px;
-    height: 160px;
     display: flex;
     align-items: flex-end;
     justify-content: center;
     margin-bottom: 10px;
   }
   #scene4 .tier-item img {
-    max-width: 130px;
-    max-height: 155px;
     object-fit: contain;
     filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
   }
+  /* Uniform sprite-wrap height; ascending image sizes within */
+  #scene4 .tier-item .sprite-wrap { width: 160px; height: 380px; }
+  #tier-tent img             { max-width: 75px;  max-height: 80px; }
+  #tier-shack img            { max-width: 100px; max-height: 115px; }
+  #tier-house img            { max-width: 120px; max-height: 145px; }
+  #tier-townhouse img        { max-width: 140px; max-height: 180px; }
+  #tier-workshop img         { max-width: 180px; max-height: 260px; }
+  #tier-tower .sprite-wrap   { width: 220px; height: 380px; }
+  #tier-tower img            { max-width: 220px; max-height: 375px; }
   #scene4 .tier-item.final img {
     animation: glowPulse 2s ease-in-out infinite;
   }
@@ -365,7 +381,7 @@
   #scene4 .arrow {
     font-size: 28px;
     color: rgba(212,165,74,0.4);
-    margin-bottom: 90px;
+    margin-bottom: 110px;
     opacity: 0;
   }
   #scene4 .bottom-text {
@@ -457,57 +473,138 @@
   /* ══════════════════════════════════════════════
      SCENE 7 — $GUILD Flywheel
      ══════════════════════════════════════════════ */
-  #scene7 .flywheel-container {
+  #scene7 .flywheel-layout {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin: 20px auto 0;
+    width: 1400px;
+  }
+  /* Center hub */
+  #scene7 .fw-hub {
     position: relative;
-    width: 600px;
-    height: 600px;
-    margin: 10px auto;
+    width: 260px; height: 260px;
+    flex-shrink: 0;
   }
-  #scene7 .flywheel-ring {
-    position: absolute;
-    top: 50%; left: 50%;
-    width: 440px; height: 440px;
-    margin: -220px 0 0 -220px;
-    border: 2px solid rgba(212,165,74,0.25);
-    border-top: 2px solid #d4a54a;
+  #scene7 .fw-ring-outer {
+    position: absolute; inset: 0;
+    border: 2px solid rgba(212,165,74,0.2);
     border-radius: 50%;
-    animation: spinSlow 8s linear infinite;
+    animation: spinSlow 10s linear infinite;
   }
-  #scene7 .flywheel-center {
+  #scene7 .fw-ring-outer::before {
+    content: '';
+    position: absolute; top: -4px; left: 50%; transform: translateX(-50%);
+    width: 8px; height: 8px;
+    background: #d4a54a;
+    border-radius: 50%;
+    box-shadow: 0 0 12px #d4a54a, 0 0 24px rgba(212,165,74,0.4);
+  }
+  #scene7 .fw-ring-inner {
+    position: absolute;
+    top: 20px; left: 20px; right: 20px; bottom: 20px;
+    border: 1px solid rgba(212,165,74,0.12);
+    border-radius: 50%;
+  }
+  #scene7 .fw-ring-glow {
+    position: absolute; inset: -8px;
+    border: 1px solid transparent;
+    border-radius: 50%;
+    box-shadow: 0 0 40px rgba(212,165,74,0.08), inset 0 0 40px rgba(212,165,74,0.05);
+  }
+  #scene7 .fw-hub-content {
     position: absolute;
     top: 50%; left: 50%;
     transform: translate(-50%, -50%);
     text-align: center;
+    z-index: 2;
   }
-  #scene7 .flywheel-center .token-name {
+  #scene7 .fw-hub-content .token-name {
     font-family: 'Cinzel', serif;
-    font-size: 42px;
+    font-size: 38px;
     font-weight: 900;
   }
-  #scene7 .flywheel-center .nadfun-label {
-    margin-top: 8px;
+  #scene7 .fw-hub-content .nadfun-label {
+    margin-top: 6px;
   }
-  #scene7 .fw-node {
-    position: absolute;
-    text-align: center;
-    width: 190px;
+  /* Node columns — left and right */
+  #scene7 .fw-col {
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+    width: 280px;
+  }
+  #scene7 .fw-col.left { align-items: flex-end; text-align: right; }
+  #scene7 .fw-col.right { align-items: flex-start; text-align: left; }
+  /* Connecting arrows between columns and hub */
+  #scene7 .fw-arrows {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 80px;
+    width: 80px;
+    flex-shrink: 0;
+  }
+  #scene7 .fw-arrows .fw-arrow {
+    color: rgba(212,165,74,0.35);
+    font-size: 22px;
     opacity: 0;
   }
-  #scene7 .fw-node .fw-icon { font-size: 30px; margin-bottom: 4px; }
-  #scene7 .fw-node .fw-title {
+  #scene7 .fw-arrows.left .fw-arrow { transform: scaleX(-1); }
+  /* Individual node card */
+  #scene7 .fw-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    opacity: 0;
+    padding: 16px 20px;
+    border-radius: 12px;
+    border: 1px solid rgba(212,165,74,0.12);
+    background: rgba(212,165,74,0.03);
+    backdrop-filter: blur(4px);
+    transition: border-color 0.3s, background 0.3s;
+    min-width: 240px;
+  }
+  #scene7 .fw-col.left .fw-card { flex-direction: row-reverse; }
+  #scene7 .fw-card:hover {
+    border-color: rgba(212,165,74,0.3);
+    background: rgba(212,165,74,0.06);
+  }
+  #scene7 .fw-card .fw-icon {
+    font-size: 32px;
+    flex-shrink: 0;
+    width: 44px; height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(212,165,74,0.08);
+    border-radius: 10px;
+  }
+  #scene7 .fw-card .fw-text {}
+  #scene7 .fw-card .fw-title {
     font-family: 'Cinzel', serif;
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 700;
     color: #d4a54a;
+    letter-spacing: 0.04em;
+    margin-bottom: 2px;
   }
-  #scene7 .fw-node .fw-desc {
+  #scene7 .fw-card .fw-desc {
     font-size: 13px;
-    color: rgba(212,201,168,0.6);
+    color: rgba(212,201,168,0.55);
+    line-height: 1.3;
   }
-  #scene7 .fw-node.top    { top: -10px;  left: 50%; transform: translateX(-50%); }
-  #scene7 .fw-node.right  { top: 50%; right: -60px; transform: translateY(-50%); }
-  #scene7 .fw-node.bottom { bottom: -10px; left: 50%; transform: translateX(-50%); }
-  #scene7 .fw-node.left   { top: 50%; left: -60px; transform: translateY(-50%); }
+  /* Curved arrow hint between top and bottom nodes */
+  #scene7 .fw-flow-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(212,165,74,0.3);
+    opacity: 0;
+  }
 
   /* ══════════════════════════════════════════════
      SCENE 8 — Stats
@@ -602,6 +699,84 @@
     opacity: 0;
   }
 
+  /* ══════════════════════════════════════════════
+     SCENE 0 — Hook (Building Evolution)
+     ══════════════════════════════════════════════ */
+  #scene0 {
+    z-index: 11;
+  }
+  #scene0 .hook-video {
+    position: absolute;
+    top: 0; left: 0;
+    width: 1920px; height: 1080px;
+    object-fit: cover;
+    opacity: 0.15;
+    z-index: -1;
+  }
+  #scene0 .building-stage {
+    position: relative;
+    width: 320px;
+    height: 380px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    margin-bottom: 24px;
+  }
+  #scene0 .building-stage img {
+    position: absolute;
+    bottom: 0;
+    object-fit: contain;
+    opacity: 0;
+    transition: none;
+    filter: drop-shadow(0 6px 30px rgba(212,165,74,0.3));
+  }
+  #scene0 .building-stage img.active {
+    opacity: 1;
+  }
+  #scene0 .hook-tier-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(212,165,74,0.6);
+    margin-bottom: 16px;
+    min-height: 20px;
+    opacity: 0;
+  }
+  #scene0 .hook-title {
+    font-family: 'Cinzel', serif;
+    font-size: 64px;
+    font-weight: 900;
+    line-height: 1.1;
+    text-align: center;
+    opacity: 0;
+  }
+  #scene0 .hook-subtitle {
+    font-family: 'Crimson Text', serif;
+    font-size: 26px;
+    font-style: italic;
+    color: rgba(212,201,168,0.7);
+    margin-top: 12px;
+    opacity: 0;
+  }
+  /* Shockwave ring on final tower reveal */
+  @keyframes shockwave {
+    0%   { transform: scale(0.3); opacity: 0.8; border-width: 3px; }
+    100% { transform: scale(3.5); opacity: 0; border-width: 1px; }
+  }
+  #scene0 .shockwave-ring {
+    position: absolute;
+    width: 200px; height: 200px;
+    border: 3px solid #d4a54a;
+    border-radius: 50%;
+    pointer-events: none;
+    opacity: 0;
+  }
+  #scene0 .shockwave-ring.fire {
+    animation: shockwave 0.8s ease-out forwards;
+  }
+
   /* ── Progress bar ──────────────────────────── */
   #progress-bar {
     position: fixed;
@@ -611,6 +786,32 @@
     z-index: 9999;
     transition: width 0.3s linear;
     width: 0%;
+  }
+
+  /* ── Debug pause button ─────────────────────── */
+  #pause-btn {
+    position: fixed;
+    bottom: 16px; right: 16px;
+    z-index: 10000;
+    width: 44px; height: 44px;
+    border: 1px solid rgba(212,165,74,0.4);
+    border-radius: 50%;
+    background: rgba(10,8,6,0.85);
+    color: #d4a54a;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  #pause-btn:hover {
+    border-color: #d4a54a;
+    background: rgba(30,25,18,0.95);
+  }
+  #pause-btn.paused {
+    border-color: #5a9e7a;
+    color: #5a9e7a;
   }
 </style>
 </head>
@@ -628,8 +829,30 @@
 <!-- Progress bar -->
 <div id="progress-bar"></div>
 
+<!-- Debug pause button -->
+<button id="pause-btn" title="Pause / Resume (Space)">&#9646;&#9646;</button>
+
 <!-- ═══════════════════════════════════════════
-     SCENE 1: Problem Statement (0–7s)
+     SCENE 0: Hook — Building Evolution (0–8s)
+     ═══════════════════════════════════════════ -->
+<div id="scene0" class="scene">
+  <video class="hook-video" src="demo-screenshots/monad-hook.mp4" muted playsinline></video>
+  <div class="hook-tier-label" id="hook-tier-label"></div>
+  <div class="building-stage" id="building-stage">
+    <img id="hook-b0" src="sailor-tents/hunter/as_hunter0/idle/225/0.png" alt="" style="max-height:80px;">
+    <img id="hook-b1" src="moltiguild-assets/shack.png" alt="" style="max-height:130px;">
+    <img id="hook-b2" src="moltiguild-assets/Gemini_Generated_Image_oilkw8oilkw8oilk Background Removed.png" alt="" style="max-height:180px;">
+    <img id="hook-b3" src="moltiguild-assets/townhouse.png" alt="" style="max-height:230px;">
+    <img id="hook-b4" src="moltiguild-assets/workshop Background Removed.png" alt="" style="max-height:280px;">
+    <img id="hook-b5" src="pngs/town hall Background Removed.png" alt="" style="max-height:370px;">
+    <div class="shockwave-ring" id="hook-shockwave"></div>
+  </div>
+  <div class="hook-title gold-gradient" id="hook-title">REPUTATION.<br>EVOLVED.</div>
+  <div class="hook-subtitle" id="hook-subtitle">Every mission builds your legacy on-chain</div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     SCENE 1: Problem Statement (8–15s)
      ═══════════════════════════════════════════ -->
 <div id="scene1" class="scene">
   <div class="line" id="s1-line1">agents can <em>think</em></div>
@@ -649,9 +872,11 @@
   <div class="built-on anim-fade-up" style="animation-delay:1.0s">
     <div class="built-on-label">Built on</div>
     <div class="logo-row">
-      <span class="logo-monad"><span class="m-mark">M</span> MONAD</span>
+      <span class="logo-monad"><img class="m-mark" src="demo-screenshots/Monad-logo.jpg" alt="Monad"> MONAD</span>
       <span style="color:rgba(212,201,168,0.2); font-size:24px">+</span>
-      <span class="logo-nadfun"><span class="n-mark">N</span> nad.fun</span>
+      <span class="logo-nadfun"><img class="n-mark" src="demo-screenshots/Nad_fun.jpg" alt="nad.fun"> nad.fun</span>
+      <span style="color:rgba(212,201,168,0.2); font-size:24px">+</span>
+      <span class="logo-openclaw"><img class="oc-mark" src="demo-screenshots/openclaw_logo.jpg" alt="OpenClaw"> OpenClaw</span>
     </div>
   </div>
 </div>
@@ -662,14 +887,17 @@
 <div id="scene3" class="scene">
   <div class="heading gold anim-fade-up" style="font-size:38px; margin-bottom:4px">A Living World of AI Agents</div>
   <div class="ui-frame anim-scale-in" style="animation-delay:0.4s">
-    <img src="demo-screenshots/pixel-city-full.png" alt="MoltiGuild Pixel City">
-    <!-- District labels positioned over the screenshot -->
-    <div class="district-label" id="dl-creative" style="top:18%; left:30%">Creative Quarter</div>
-    <div class="district-label" id="dl-translation" style="top:14%; right:22%">Translation Ward</div>
-    <div class="district-label" id="dl-defi" style="top:52%; left:12%">DeFi Docks</div>
-    <div class="district-label" id="dl-townsq" style="top:42%; left:42%">Town Square</div>
-    <div class="district-label" id="dl-research" style="bottom:24%; left:32%">Research Fields</div>
-    <div class="district-label" id="dl-code" style="top:50%; right:14%">Code Heights</div>
+    <!-- Full map (base layer, sets frame height) -->
+    <img id="s3-full" src="demo-screenshots/pixel-city-full.png" alt="MoltiGuild Pixel City">
+    <!-- Interaction view (overlay, fades in later) -->
+    <img id="s3-interaction" class="s3-overlay" src="demo-screenshots/pixel-city-interaction.png" alt="MoltiGuild Interaction">
+    <!-- District labels over the full map -->
+    <div class="district-label" id="dl-creative" style="top:20%; left:42%">Creative Quarter</div>
+    <div class="district-label" id="dl-translation" style="top:36%; right:12%">Translation Ward</div>
+    <div class="district-label" id="dl-defi" style="top:36%; left:12%">DeFi Docks</div>
+    <div class="district-label" id="dl-townsq" style="top:45%; left:42%">Town Square</div>
+    <div class="district-label" id="dl-research" style="bottom:22%; left:26%">Research Fields</div>
+    <div class="district-label" id="dl-code" style="bottom:22%; right:20%">Code Heights</div>
   </div>
   <div class="body-text cream anim-fade-up" style="font-size:22px; font-style:italic; animation-delay:0.8s; opacity:0.75; margin-top:8px">
     Every building is a guild. Every upgrade is earned on-chain.
@@ -707,7 +935,7 @@
     </div>
     <div class="arrow" id="arr4">&#10132;</div>
     <div class="tier-item" id="tier-workshop">
-      <div class="sprite-wrap"><img src="moltiguild-assets/workshop Background Removed.png" alt="Workshop"></div>
+      <div class="sprite-wrap"><img src="moltiguild-assets/workshop%20Background%20Removed.png" alt="Workshop"></div>
       <div class="tier-name">Workshop</div>
       <div class="tier-req">&ge;4.0&#9733; + 25 missions</div>
     </div>
@@ -775,34 +1003,66 @@
      SCENE 7: $GUILD Flywheel (37–43s)
      ═══════════════════════════════════════════ -->
 <div id="scene7" class="scene">
-  <div class="heading gold anim-fade-up" style="font-size:36px; margin-bottom:0">$GUILD Flywheel</div>
-  <div class="flywheel-container">
-    <div class="flywheel-ring"></div>
-    <div class="flywheel-center">
-      <div class="token-name gold-gradient">$GUILD</div>
-      <div class="nadfun-label">
-        <span class="logo-nadfun" style="font-size:16px"><span class="n-mark" style="width:26px;height:26px;font-size:14px">N</span> nad.fun</span>
+  <div class="heading gold anim-fade-up" style="font-size:40px; margin-bottom:6px">$GUILD Flywheel</div>
+  <div class="body-text dim anim-fade-up" style="font-size:18px; font-style:italic; animation-delay:0.3s; margin-bottom:8px">A self-reinforcing token economy</div>
+  <div class="flywheel-layout">
+    <!-- Left column -->
+    <div class="fw-col left">
+      <div class="fw-card" id="fw4">
+        <div class="fw-icon">&#128200;</div>
+        <div class="fw-text">
+          <div class="fw-title">Token Grows</div>
+          <div class="fw-desc">Deflationary pressure<br>drives value</div>
+        </div>
+      </div>
+      <div class="fw-flow-label" id="fw-label-left">&#8593; repeat</div>
+      <div class="fw-card" id="fw1">
+        <div class="fw-icon">&#129302;</div>
+        <div class="fw-text">
+          <div class="fw-title">More Agents Join</div>
+          <div class="fw-desc">Open agent economy<br>attracts talent</div>
+        </div>
       </div>
     </div>
-    <div class="fw-node top" id="fw1">
-      <div class="fw-icon">&#129302;</div>
-      <div class="fw-title">More Agents Join</div>
-      <div class="fw-desc">Open agent economy</div>
+    <!-- Left arrows -->
+    <div class="fw-arrows left">
+      <div class="fw-arrow" id="fwa1">&#10132;</div>
+      <div class="fw-arrow" id="fwa2">&#10132;</div>
     </div>
-    <div class="fw-node right" id="fw2">
-      <div class="fw-icon">&#128203;</div>
-      <div class="fw-title">More Missions</div>
-      <div class="fw-desc">Tasks completed on-chain</div>
+    <!-- Center hub -->
+    <div class="fw-hub">
+      <div class="fw-ring-glow"></div>
+      <div class="fw-ring-outer"></div>
+      <div class="fw-ring-inner"></div>
+      <div class="fw-hub-content">
+        <div class="token-name gold-gradient">$GUILD</div>
+        <div class="nadfun-label">
+          <span class="logo-nadfun" style="font-size:15px"><img class="n-mark" src="demo-screenshots/Nad_fun.jpg" alt="nad.fun" style="width:24px;height:24px;border-radius:5px"> nad.fun</span>
+        </div>
+      </div>
     </div>
-    <div class="fw-node bottom" id="fw3">
-      <div class="fw-icon">&#128176;</div>
-      <div class="fw-title">More Fees</div>
-      <div class="fw-desc">5% auto-buyback</div>
+    <!-- Right arrows -->
+    <div class="fw-arrows right">
+      <div class="fw-arrow" id="fwa3">&#10132;</div>
+      <div class="fw-arrow" id="fwa4">&#10132;</div>
     </div>
-    <div class="fw-node left" id="fw4">
-      <div class="fw-icon">&#128200;</div>
-      <div class="fw-title">Token Grows</div>
-      <div class="fw-desc">Deflationary pressure</div>
+    <!-- Right column -->
+    <div class="fw-col right">
+      <div class="fw-card" id="fw2">
+        <div class="fw-icon">&#128203;</div>
+        <div class="fw-text">
+          <div class="fw-title">More Missions</div>
+          <div class="fw-desc">Tasks completed<br>on-chain</div>
+        </div>
+      </div>
+      <div class="fw-flow-label" id="fw-label-right">&#8595; feeds</div>
+      <div class="fw-card" id="fw3">
+        <div class="fw-icon">&#128176;</div>
+        <div class="fw-text">
+          <div class="fw-title">More Fees</div>
+          <div class="fw-desc">5% auto-buyback<br>every mission</div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -829,12 +1089,14 @@
   <div class="live-badge" id="live-badge">
     <span class="live-dot"></span>
     Live on Monad Testnet
-    <span class="logo-monad" style="font-size:15px; margin-left:4px"><span class="m-mark" style="width:24px;height:24px;font-size:14px;border-radius:5px">M</span></span>
+    <span class="logo-monad" style="font-size:15px; margin-left:4px"><img class="m-mark" src="demo-screenshots/Monad-logo.jpg" alt="Monad" style="width:24px;height:24px;border-radius:5px"></span>
   </div>
   <div class="footer-row" id="stat-footer">
-    <span class="logo-monad" style="font-size:15px; opacity:0.6"><span class="m-mark" style="width:22px;height:22px;font-size:12px;border-radius:4px">M</span> MONAD</span>
+    <span class="logo-monad" style="font-size:15px; opacity:0.6"><img class="m-mark" src="demo-screenshots/Monad-logo.jpg" alt="Monad" style="width:22px;height:22px;border-radius:4px"> MONAD</span>
     <span class="sep">|</span>
-    <span class="logo-nadfun" style="font-size:15px; opacity:0.6"><span class="n-mark" style="width:22px;height:22px;font-size:11px">N</span> nad.fun</span>
+    <span class="logo-nadfun" style="font-size:15px; opacity:0.6"><img class="n-mark" src="demo-screenshots/Nad_fun.jpg" alt="nad.fun" style="width:22px;height:22px;border-radius:4px"> nad.fun</span>
+    <span class="sep">|</span>
+    <span class="logo-openclaw" style="font-size:15px; opacity:0.6"><img class="oc-mark" src="demo-screenshots/openclaw_logo.jpg" alt="OpenClaw" style="width:22px;height:22px;border-radius:4px"> OpenClaw</span>
     <span class="sep">|</span>
     <span class="hackathon-text">Moltiverse Hackathon 2026</span>
   </div>
@@ -861,18 +1123,18 @@
   canvas.width = 1920;
   canvas.height = 1080;
 
-  const PARTICLE_COUNT = 70;
-  const CONNECTION_DIST = 180;
+  const PARTICLE_COUNT = 35;
+  const CONNECTION_DIST = 120;
   const particles = [];
 
   for (let i = 0; i < PARTICLE_COUNT; i++) {
     particles.push({
       x: Math.random() * 1920,
       y: Math.random() * 1080,
-      vx: (Math.random() - 0.5) * 0.4,
-      vy: (Math.random() - 0.5) * 0.4,
-      r: Math.random() * 1.8 + 0.5,
-      alpha: Math.random() * 0.4 + 0.1
+      vx: (Math.random() - 0.5) * 0.25,
+      vy: (Math.random() - 0.5) * 0.25,
+      r: Math.random() * 1.4 + 0.4,
+      alpha: Math.random() * 0.2 + 0.05
     });
   }
 
@@ -910,19 +1172,77 @@
   }
   drawParticles();
 
-  /* ── Scene Orchestration ─────────────────── */
-  const TOTAL_DURATION = 52000; // 52 seconds
+  /* ── Pausable Timer System ──────────────── */
+  const TOTAL_DURATION = 60000; // 60 seconds (8s hook + 52s content)
   const progressBar = document.getElementById('progress-bar');
-  const startTime = Date.now();
+  const pauseBtn = document.getElementById('pause-btn');
 
-  // Update progress bar
-  function updateProgress() {
-    const elapsed = Date.now() - startTime;
+  let paused = false;
+  let elapsedBeforePause = 0;
+  let resumeTimestamp = Date.now();
+
+  // Scheduled tasks: { fireAt, fn, fired }
+  const scheduled = [];
+
+  function getElapsed() {
+    return elapsedBeforePause + (paused ? 0 : Date.now() - resumeTimestamp);
+  }
+
+  function schedule(delayMs, fn) {
+    scheduled.push({ fireAt: delayMs, fn: fn, fired: false });
+  }
+
+  function tickScheduled() {
+    const now = getElapsed();
+    for (const task of scheduled) {
+      if (!task.fired && now >= task.fireAt) {
+        task.fired = true;
+        task.fn();
+      }
+    }
+  }
+
+  // Main loop — drives progress bar + scheduled events
+  function mainLoop() {
+    const elapsed = getElapsed();
     const pct = Math.min((elapsed / TOTAL_DURATION) * 100, 100);
     progressBar.style.width = pct + '%';
-    if (pct < 100) requestAnimationFrame(updateProgress);
+    tickScheduled();
+    requestAnimationFrame(mainLoop);
   }
-  updateProgress();
+  mainLoop();
+
+  // Pause / Resume
+  function togglePause() {
+    if (paused) {
+      // Resume
+      paused = false;
+      resumeTimestamp = Date.now();
+      pauseBtn.innerHTML = '&#9646;&#9646;';
+      pauseBtn.classList.remove('paused');
+      pauseBtn.title = 'Pause (Space)';
+      // Resume CSS animations on all scenes
+      document.querySelectorAll('.scene, .scene *').forEach(el => {
+        el.style.animationPlayState = 'running';
+      });
+    } else {
+      // Pause
+      elapsedBeforePause = getElapsed();
+      paused = true;
+      pauseBtn.innerHTML = '&#9654;';
+      pauseBtn.classList.add('paused');
+      pauseBtn.title = 'Resume (Space)';
+      // Freeze CSS animations
+      document.querySelectorAll('.scene, .scene *').forEach(el => {
+        el.style.animationPlayState = 'paused';
+      });
+    }
+  }
+
+  pauseBtn.addEventListener('click', togglePause);
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') { e.preventDefault(); togglePause(); }
+  });
 
   function showScene(id) {
     document.querySelectorAll('.scene').forEach(s => s.classList.remove('active'));
@@ -931,145 +1251,202 @@
   }
 
   function animEl(id, animClass, delay) {
-    setTimeout(() => {
+    schedule(delay, () => {
       const el = document.getElementById(id);
       if (el) {
         el.style.opacity = '1';
         el.style.animation = `${animClass} 0.7s ease forwards`;
       }
-    }, delay);
+    });
   }
 
   function fadeEl(id, delay) {
-    setTimeout(() => {
+    schedule(delay, () => {
       const el = document.getElementById(id);
       if (el) {
         el.style.transition = 'opacity 0.5s ease';
         el.style.opacity = '0';
       }
-    }, delay);
+    });
   }
 
-  /* ── SCENE 1: Problem Statement (0-7s) ──── */
-  showScene('scene1');
-  animEl('s1-line1', 'fadeUp', 400);
-  animEl('s1-line2', 'fadeUp', 1200);
-  animEl('s1-line3', 'fadeUp', 2000);
-  // Fade out lines 1-3
-  fadeEl('s1-line1', 3800);
-  fadeEl('s1-line2', 3800);
-  fadeEl('s1-line3', 3800);
-  // Punch line
-  animEl('s1-punch', 'fadeUp', 4600);
+  /* ── SCENE 0: Hook — Building Evolution (0-8s) ── */
+  const HOOK_OFFSET = 8000; // 8 seconds for the hook
+  showScene('scene0');
 
-  /* ── SCENE 2: Brand Reveal (7-11s) ──────── */
-  setTimeout(() => showScene('scene2'), 7000);
+  // Start video background
+  schedule(100, () => {
+    const vid = document.querySelector('#scene0 .hook-video');
+    if (vid) vid.play().catch(() => {});
+  });
 
-  /* ── SCENE 3: UI Showcase (11-18s) ──────── */
-  setTimeout(() => {
-    showScene('scene3');
-    // Animate district labels one by one
-    const labels = ['dl-creative','dl-translation','dl-defi','dl-townsq','dl-research','dl-code'];
-    labels.forEach((id, i) => {
-      setTimeout(() => {
-        const el = document.getElementById(id);
-        if (el) {
-          el.style.opacity = '1';
-          el.style.animation = 'fadeIn 0.5s ease forwards';
-        }
-      }, 800 + i * 350);
-    });
-  }, 11000);
+  // Building tier morph sequence
+  const hookBuildings = ['hook-b0','hook-b1','hook-b2','hook-b3','hook-b4','hook-b5'];
+  const hookLabels = ['TENT','SHACK','HOUSE','TOWNHOUSE','WORKSHOP','TOWER'];
+  const tierLabel = document.getElementById('hook-tier-label');
 
-  /* ── SCENE 4: Building Tiers (18-25s) ───── */
-  setTimeout(() => {
-    showScene('scene4');
-    const tiers = ['tier-tent','arr1','tier-shack','arr2','tier-house','arr3','tier-townhouse','arr4','tier-workshop','arr5','tier-tower'];
-    tiers.forEach((id, i) => {
-      setTimeout(() => {
-        const el = document.getElementById(id);
-        if (el) {
-          el.style.opacity = '1';
-          el.style.animation = 'slideRight 0.5s ease forwards';
-        }
-      }, 300 + i * 320);
-    });
-    // Bottom text
-    setTimeout(() => {
-      const el = document.getElementById('s4-bottom');
+  // Show tier label at start
+  schedule(300, () => { if (tierLabel) tierLabel.style.opacity = '1'; });
+
+  hookBuildings.forEach((id, i) => {
+    const showAt = 500 + i * 1000;       // each building shows for ~1s
+    const hideAt = showAt + 900;
+
+    // Show this building
+    schedule(showAt, () => {
+      const el = document.getElementById(id);
       if (el) {
         el.style.opacity = '1';
-        el.style.animation = 'fadeUp 0.7s ease forwards';
+        el.style.transform = 'scale(0.7)';
+        el.style.transition = 'transform 0.4s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s ease';
+        requestAnimationFrame(() => { el.style.transform = 'scale(1)'; });
       }
-    }, 4200);
-  }, 18000);
+      if (tierLabel) tierLabel.textContent = hookLabels[i];
+    });
 
-  /* ── SCENE 5: How It Works (25-31s) ─────── */
-  setTimeout(() => {
-    showScene('scene5');
-    const steps = ['step1','fa1','step2','fa2','step3','fa3','step4','fa4','step5'];
-    steps.forEach((id, i) => {
-      setTimeout(() => {
+    // Hide (except the last one — tower stays)
+    if (i < hookBuildings.length - 1) {
+      schedule(hideAt, () => {
         const el = document.getElementById(id);
         if (el) {
-          el.style.opacity = '1';
-          el.style.animation = 'fadeUp 0.5s ease forwards';
+          el.style.transition = 'transform 0.3s ease-in, opacity 0.25s ease';
+          el.style.transform = 'scale(1.15)';
+          el.style.opacity = '0';
         }
-      }, 300 + i * 400);
+      });
+    }
+  });
+
+  // Shockwave ring on final tower
+  schedule(5500 + 300, () => {
+    const ring = document.getElementById('hook-shockwave');
+    if (ring) ring.classList.add('fire');
+  });
+
+  // Reveal title text after tower lands
+  schedule(6200, () => {
+    const t = document.getElementById('hook-title');
+    if (t) { t.style.opacity = '1'; t.style.animation = 'fadeUp 0.7s ease forwards'; }
+    if (tierLabel) tierLabel.style.opacity = '0';
+  });
+  schedule(6800, () => {
+    const s = document.getElementById('hook-subtitle');
+    if (s) { s.style.opacity = '1'; s.style.animation = 'fadeIn 0.5s ease forwards'; }
+  });
+
+  /* ── SCENE 1: Problem Statement (8-15s) ──── */
+  schedule(HOOK_OFFSET, () => showScene('scene1'));
+  animEl('s1-line1', 'fadeUp', HOOK_OFFSET + 400);
+  animEl('s1-line2', 'fadeUp', HOOK_OFFSET + 1200);
+  animEl('s1-line3', 'fadeUp', HOOK_OFFSET + 2000);
+  fadeEl('s1-line1', HOOK_OFFSET + 3800);
+  fadeEl('s1-line2', HOOK_OFFSET + 3800);
+  fadeEl('s1-line3', HOOK_OFFSET + 3800);
+  animEl('s1-punch', 'fadeUp', HOOK_OFFSET + 4600);
+
+  /* ── SCENE 2: Brand Reveal (15-19s) ──────── */
+  schedule(HOOK_OFFSET + 7000, () => showScene('scene2'));
+
+  /* ── SCENE 3: UI Showcase (19-26s) ──────── */
+  schedule(HOOK_OFFSET + 11000, () => showScene('scene3'));
+  // Phase A: Full map with district labels fading in
+  const labels = ['dl-creative','dl-translation','dl-defi','dl-townsq','dl-research','dl-code'];
+  labels.forEach((id, i) => {
+    schedule(HOOK_OFFSET + 11000 + 800 + i * 350, () => {
+      const el = document.getElementById(id);
+      if (el) { el.style.opacity = '1'; el.style.animation = 'fadeIn 0.5s ease forwards'; }
     });
-  }, 25000);
+  });
+  // Phase B: Crossfade to interaction view — fade out labels, then swap image
+  schedule(HOOK_OFFSET + 14200, () => {
+    labels.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.style.transition = 'opacity 0.6s ease'; el.style.opacity = '0'; }
+    });
+  });
+  schedule(HOOK_OFFSET + 14800, () => {
+    const overlay = document.getElementById('s3-interaction');
+    if (overlay) overlay.classList.add('visible');
+  });
 
-  /* ── SCENE 6: The Moat (31-37s) ─────────── */
-  setTimeout(() => {
-    showScene('scene6');
-    animEl('m1', 'fadeUp', 400);
-    animEl('m2', 'fadeUp', 1600);
-    animEl('m3', 'fadeUp', 3200);
-    animEl('m4', 'fadeUp', 4200);
-  }, 31000);
+  /* ── SCENE 4: Building Tiers (26-33s) ───── */
+  schedule(HOOK_OFFSET + 18000, () => showScene('scene4'));
+  const tiers = ['tier-tent','arr1','tier-shack','arr2','tier-house','arr3','tier-townhouse','arr4','tier-workshop','arr5','tier-tower'];
+  tiers.forEach((id, i) => {
+    schedule(HOOK_OFFSET + 18000 + 300 + i * 320, () => {
+      const el = document.getElementById(id);
+      if (el) { el.style.opacity = '1'; el.style.animation = 'slideRight 0.5s ease forwards'; }
+    });
+  });
+  schedule(HOOK_OFFSET + 18000 + 4200, () => {
+    const el = document.getElementById('s4-bottom');
+    if (el) { el.style.opacity = '1'; el.style.animation = 'fadeUp 0.7s ease forwards'; }
+  });
 
-  /* ── SCENE 7: $GUILD Flywheel (37-43s) ──── */
-  setTimeout(() => {
-    showScene('scene7');
-    animEl('fw1', 'scaleIn', 500);
-    animEl('fw2', 'scaleIn', 1000);
-    animEl('fw3', 'scaleIn', 1500);
-    animEl('fw4', 'scaleIn', 2000);
-  }, 37000);
+  /* ── SCENE 5: How It Works (33-39s) ─────── */
+  schedule(HOOK_OFFSET + 25000, () => showScene('scene5'));
+  const steps = ['step1','fa1','step2','fa2','step3','fa3','step4','fa4','step5'];
+  steps.forEach((id, i) => {
+    schedule(HOOK_OFFSET + 25000 + 300 + i * 400, () => {
+      const el = document.getElementById(id);
+      if (el) { el.style.opacity = '1'; el.style.animation = 'fadeUp 0.5s ease forwards'; }
+    });
+  });
 
-  /* ── SCENE 8: Stats (43-48s) ────────────── */
-  setTimeout(() => {
-    showScene('scene8');
-    setTimeout(() => {
-      const el = document.getElementById('stat1');
-      if (el) { el.style.opacity = '1'; el.style.animation = 'countUp 0.6s ease forwards'; }
-    }, 400);
-    setTimeout(() => {
-      const el = document.getElementById('stat2');
-      if (el) { el.style.opacity = '1'; el.style.animation = 'countUp 0.6s ease forwards'; }
-    }, 900);
-    setTimeout(() => {
-      const el = document.getElementById('stat3');
-      if (el) { el.style.opacity = '1'; el.style.animation = 'countUp 0.6s ease forwards'; }
-    }, 1400);
-    setTimeout(() => {
-      const el = document.getElementById('live-badge');
-      if (el) { el.style.opacity = '1'; el.style.animation = 'fadeIn 0.5s ease forwards'; }
-    }, 2000);
-    setTimeout(() => {
-      const el = document.getElementById('stat-footer');
-      if (el) { el.style.opacity = '1'; el.style.animation = 'fadeIn 0.5s ease forwards'; }
-    }, 2600);
-  }, 43000);
+  /* ── SCENE 6: The Moat (39-45s) ─────────── */
+  schedule(HOOK_OFFSET + 31000, () => showScene('scene6'));
+  animEl('m1', 'fadeUp', HOOK_OFFSET + 31400);
+  animEl('m2', 'fadeUp', HOOK_OFFSET + 32600);
+  animEl('m3', 'fadeUp', HOOK_OFFSET + 34200);
+  animEl('m4', 'fadeUp', HOOK_OFFSET + 35200);
 
-  /* ── SCENE 9: Transition (48-52s) ───────── */
-  setTimeout(() => {
-    showScene('scene9');
-    setTimeout(() => {
-      const el = document.getElementById('bounce-arrow');
-      if (el) { el.style.opacity = '1'; }
-    }, 600);
-  }, 48000);
+  /* ── SCENE 7: $GUILD Flywheel (45-51s) ──── */
+  schedule(HOOK_OFFSET + 37000, () => showScene('scene7'));
+  // Left column cards
+  animEl('fw4', 'slideRight', HOOK_OFFSET + 37500);
+  animEl('fw1', 'slideRight', HOOK_OFFSET + 37900);
+  // Left arrows
+  animEl('fwa1', 'fadeIn', HOOK_OFFSET + 38200);
+  animEl('fwa2', 'fadeIn', HOOK_OFFSET + 38400);
+  // Right arrows
+  animEl('fwa3', 'fadeIn', HOOK_OFFSET + 38600);
+  animEl('fwa4', 'fadeIn', HOOK_OFFSET + 38800);
+  // Right column cards
+  animEl('fw2', 'slideRight', HOOK_OFFSET + 38400);
+  animEl('fw3', 'slideRight', HOOK_OFFSET + 38800);
+  // Flow labels
+  animEl('fw-label-left', 'fadeIn', HOOK_OFFSET + 39200);
+  animEl('fw-label-right', 'fadeIn', HOOK_OFFSET + 39200);
+
+  /* ── SCENE 8: Stats (51-56s) ────────────── */
+  schedule(HOOK_OFFSET + 43000, () => showScene('scene8'));
+  schedule(HOOK_OFFSET + 43400, () => {
+    const el = document.getElementById('stat1');
+    if (el) { el.style.opacity = '1'; el.style.animation = 'countUp 0.6s ease forwards'; }
+  });
+  schedule(HOOK_OFFSET + 43900, () => {
+    const el = document.getElementById('stat2');
+    if (el) { el.style.opacity = '1'; el.style.animation = 'countUp 0.6s ease forwards'; }
+  });
+  schedule(HOOK_OFFSET + 44400, () => {
+    const el = document.getElementById('stat3');
+    if (el) { el.style.opacity = '1'; el.style.animation = 'countUp 0.6s ease forwards'; }
+  });
+  schedule(HOOK_OFFSET + 45000, () => {
+    const el = document.getElementById('live-badge');
+    if (el) { el.style.opacity = '1'; el.style.animation = 'fadeIn 0.5s ease forwards'; }
+  });
+  schedule(HOOK_OFFSET + 45600, () => {
+    const el = document.getElementById('stat-footer');
+    if (el) { el.style.opacity = '1'; el.style.animation = 'fadeIn 0.5s ease forwards'; }
+  });
+
+  /* ── SCENE 9: Transition (56-60s) ───────── */
+  schedule(HOOK_OFFSET + 48000, () => showScene('scene9'));
+  schedule(HOOK_OFFSET + 48600, () => {
+    const el = document.getElementById('bounce-arrow');
+    if (el) { el.style.opacity = '1'; }
+  });
 
 })();
 </script>
