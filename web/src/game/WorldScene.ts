@@ -35,19 +35,8 @@ export class WorldScene extends Phaser.Scene {
   }
 
   preload(): void {
-    // Sailor tents for DeFi Docks
+    // Sailor tent for agent tent-tier buildings
     this.load.image('tent-hunter', '/sailor-tents/hunter/as_hunter0/idle/225/0.png');
-    this.load.image('tent-lumberjack', '/sailor-tents/lumberjack/as_lumberjack0/idle/225/0.png');
-    this.load.image('tent-pavilion', '/sailor-tents/pavilion/as_pavilion0/idle/225/0.png');
-    this.load.image('tent-storagetent', '/sailor-tents/storagetent/as_storagetent0/idle/225/0.png');
-
-    // Isometric Building Pack (extracted PNGs)
-    this.load.image('bldg-barracks', '/buildings/barracks.png');
-    this.load.image('bldg-church', '/buildings/church.png');
-    this.load.image('bldg-firestation', '/buildings/firestation.png');
-    this.load.image('bldg-herbary-full', '/buildings/herbary-full.png');
-    this.load.image('bldg-signal-fire', '/buildings/signal-fire.png');
-    this.load.image('bldg-weaponsmith', '/buildings/weaponsmith.png');
 
     // ── Custom MoltiGuild building sprites ──
     const mg = '/moltiguild-assets';
@@ -94,8 +83,6 @@ export class WorldScene extends Phaser.Scene {
 
     // ── Custom guild-related sprites ──
     this.load.image('guild-townhall', `${pg}/town%20hall%20Background%20Removed.png`);
-    this.load.image('guild-ornate', `${pg}/ornate%20architecture%20(1)%20Background%20Removed.png`);
-    this.load.image('guild-cathedral', `${pg}/Gemini_Generated_Image_ok4w08ok4w08ok4w%20Background%20Removed.png`);
 
     // Grass tile texture (dark variant)
     this.load.image('grass-dark', '/grass/tilable-IMG_0044-dark.png');
@@ -117,6 +104,7 @@ export class WorldScene extends Phaser.Scene {
       this.tilemapManager.worldHeight
     );
     this.buildingManager = new BuildingManager(this);
+    this.guildHallManager = new GuildHallManager(this);
     this.particleManager = new ParticleManager(this);
 
     // Lay terrain tiles per biome (depth 0, below district color overlay)
@@ -152,6 +140,11 @@ export class WorldScene extends Phaser.Scene {
       fountain.setDepth(depth);
       if (tsBounds) this.trackAsset(tsBounds.centerCol, tsBounds.centerRow, 'deco-fountain');
     }
+
+    // Wire manager dependencies (TreeManager placeholder for clearing support)
+    this.treeManager = new TreeManager(this, this.tilemapManager, this.buildingPositions);
+    this.buildingManager.setDependencies(this.tilemapManager, this.treeManager);
+    this.guildHallManager.setDependencies(this.tilemapManager, this.treeManager);
 
     // Minimap (pass building positions for dot markers)
     this.minimapManager = new MinimapManager(this, this.tilemapManager, this.buildingPositions);
@@ -929,9 +922,18 @@ export class WorldScene extends Phaser.Scene {
   }
 
   updateWorldState(worldState: WorldState): void {
-    if (!worldState) return;
+    if (!worldState) {
+      console.warn('[WorldScene] updateWorldState called with null worldState');
+      return;
+    }
     // Guard: managers aren't ready until create() completes
-    if (!this.guildHallManager || !this.buildingManager) return;
+    if (!this.guildHallManager || !this.buildingManager) {
+      console.warn('[WorldScene] updateWorldState skipped — managers not ready',
+        { guildHallMgr: !!this.guildHallManager, buildingMgr: !!this.buildingManager });
+      return;
+    }
+    console.log('[WorldScene] updateWorldState',
+      { guilds: worldState.guilds.length, agents: worldState.agents.length });
     // Place/update guild hall buildings (1 per guild)
     this.guildHallManager.updateGuildHalls(worldState.guilds);
     // Place/update per-agent buildings (tier-based)

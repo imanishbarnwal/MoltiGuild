@@ -1,11 +1,10 @@
 import * as Phaser from 'phaser';
 import { TilemapManager } from './TilemapManager';
 
-/** Buildings that emit chimney smoke. */
+/** Buildings that emit chimney smoke (workshops have forges). */
 const SMOKE_BUILDINGS = new Set([
-  'bldg-firestation',
-  'bldg-weaponsmith',
-  'bldg-signal-fire',
+  'bldg-workshop',
+  'custom-workshop',
 ]);
 
 /** Biome particle configs: texture color, particle size, direction, frequency. */

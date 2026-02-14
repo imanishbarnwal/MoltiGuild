@@ -54,7 +54,6 @@ export class TreeManager {
   private static readonly NOISE_SEED = 1337;
   private static readonly NOISE_GRID = 6;
   private static readonly BUILDING_CLEARANCE_SQ = 16; // 4-tile radius
-  private static readonly DISTRICT_CLEARANCE = 2;     // 2 tiles from district border
   private static readonly TARGET_PERCENT = 0.12;      // target: 12% of total grass tiles
 
   constructor(
@@ -66,7 +65,7 @@ export class TreeManager {
   scatter(): void {
     const {
       NOISE_SEED, NOISE_GRID,
-      BUILDING_CLEARANCE_SQ, DISTRICT_CLEARANCE, TARGET_PERCENT,
+      BUILDING_CLEARANCE_SQ, TARGET_PERCENT,
     } = TreeManager;
 
     const noise = new ValueNoise2D(NOISE_GRID, NOISE_SEED);
@@ -99,8 +98,8 @@ export class TreeManager {
         );
         if (nearBuilding) continue;
 
-        // Skip tiles too close to any district (2-tile radius)
-        if (this.isNearDistrict(col, row, DISTRICT_CLEARANCE)) continue;
+        // Skip tiles on district borders (within 1 tile of a different district)
+        if (this.isDistrictBorder(col, row)) continue;
 
         // Sample two noise octaves for organic clustering
         const nx = (col / GRID_COLS) * NOISE_GRID;
@@ -191,15 +190,17 @@ export class TreeManager {
     );
   }
 
-  /** Check if tile is within `radius` of any district tile. */
-  private isNearDistrict(col: number, row: number, radius: number): boolean {
-    for (let dy = -radius; dy <= radius; dy++) {
-      for (let dx = -radius; dx <= radius; dx++) {
+  /** Check if tile is on the border between two different districts. */
+  private isDistrictBorder(col: number, row: number): boolean {
+    const myDistrict = this.tilemapManager.getTileDistrict(col, row);
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
         if (dx === 0 && dy === 0) continue;
         const nc = col + dx;
         const nr = row + dy;
         if (nc < 0 || nr < 0 || nc >= GRID_COLS || nr >= GRID_ROWS) continue;
-        if (this.tilemapManager.getTileDistrict(nc, nr)) return true;
+        const neighbor = this.tilemapManager.getTileDistrict(nc, nr);
+        if (neighbor !== myDistrict) return true;
       }
     }
     return false;

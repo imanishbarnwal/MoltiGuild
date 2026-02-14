@@ -86,7 +86,11 @@ export class GuildHallManager {
    * Adds new guilds, upgrades tiers, removes dissolved guilds.
    */
   updateGuildHalls(guilds: GuildVisual[]): void {
-    if (!this.tilemapManager) return;
+    if (!this.tilemapManager) {
+      console.warn('[GuildHallManager] updateGuildHalls skipped — no tilemapManager');
+      return;
+    }
+    console.log('[GuildHallManager] updateGuildHalls', { count: guilds.length, existing: this.halls.length });
 
     const activeIds = new Set(guilds.map(g => g.guildId));
 
@@ -122,7 +126,11 @@ export class GuildHallManager {
 
     // Find spot using deterministic seed from guildId
     const spot = this.findDeterministicSpot(guild.guildId, districtCategory, config.footprint);
-    if (!spot) return;
+    if (!spot) {
+      console.warn('[GuildHallManager] No spot found for guild', guild.guildId, guild.name, 'in', districtCategory);
+      return;
+    }
+    console.log('[GuildHallManager] Placing guild', guild.guildId, guild.name, 'at', spot.col, spot.row, 'tier:', guild.tier);
 
     // Occupy tiles
     for (let dy = 0; dy < config.footprint; dy++) {

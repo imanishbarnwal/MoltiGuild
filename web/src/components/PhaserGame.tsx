@@ -72,6 +72,7 @@ export default function PhaserGame({ worldState, onGuildClick, onEmptyLotClick, 
         // Scene emits 'scene-created' after create() completes and all managers are ready
         game.events.on('scene-created', () => {
           sceneReadyRef.current = true;
+          console.log('[PhaserGame] scene-created, worldState:', worldStateRef.current ? `${worldStateRef.current.guilds.length} guilds` : 'null');
           // Forward current worldState now that the scene is fully initialized
           const scene = game.scene.getScene('WorldScene');
           if (scene && 'updateWorldState' in scene && worldStateRef.current) {
@@ -109,6 +110,7 @@ export default function PhaserGame({ worldState, onGuildClick, onEmptyLotClick, 
   useEffect(() => {
     worldStateRef.current = worldState;
     if (!worldState || !gameRef.current || !sceneReadyRef.current) return;
+    console.log('[PhaserGame] forwarding worldState update:', worldState.guilds.length, 'guilds,', worldState.agents.length, 'agents');
     const scene = gameRef.current.game.scene.getScene('WorldScene');
     if (scene && 'updateWorldState' in scene) {
       (scene as unknown as { updateWorldState: (ws: WorldState) => void }).updateWorldState(worldState);

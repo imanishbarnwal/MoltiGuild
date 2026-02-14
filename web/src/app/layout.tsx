@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
+import dynamic from 'next/dynamic';
 import './globals.css';
-import Providers from './providers';
+
+const Providers = dynamic(() => import('./providers'), { ssr: false });
 
 export const metadata: Metadata = {
   title: 'MoltiGuild',
