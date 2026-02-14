@@ -14,31 +14,31 @@ const GUILD_TIER_CONFIG: Record<string, {
   glowColor: number | null;
 }> = {
   bronze: {
-    sprites: ['tent-pavilion', 'tent-storagetent'],
-    scale: 0.40,
+    sprites: ['guild-bronze'],
+    scale: 0.55,
     footprint: 1,
     tint: null,
     glowColor: null,
   },
   silver: {
-    sprites: ['bldg-herbary-full', 'bldg-herbary-empty'],
-    scale: 0.48,
+    sprites: ['guild-silver'],
+    scale: 0.60,
     footprint: 1,
-    tint: 0xd0d0e0,
+    tint: null,
     glowColor: null,
   },
   gold: {
-    sprites: ['bldg-church', 'bldg-barracks'],
-    scale: 0.55,
+    sprites: ['guild-gold'],
+    scale: 0.50,
     footprint: 2,
-    tint: 0xffe0a0,
+    tint: null,
     glowColor: 0xffe080,
   },
   diamond: {
-    sprites: ['bldg-weaponsmith', 'bldg-signal-fire'],
-    scale: 0.65,
+    sprites: ['guild-diamond'],
+    scale: 0.50,
     footprint: 2,
-    tint: 0xc8f0ff,
+    tint: null,
     glowColor: 0x80d0ff,
   },
 };
