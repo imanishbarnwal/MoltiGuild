@@ -41,6 +41,14 @@ export interface GuildData {
   avgRating: number | string;
   totalMissions: number;
   memberCount: number;
+  assignedPlot?: {
+    plotId: string;
+    col: number;
+    row: number;
+    tier: string;
+    district: string;
+    assignedAt: number;
+  } | null;
 }
 
 export interface OnlineAgent {

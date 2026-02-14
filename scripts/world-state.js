@@ -204,10 +204,8 @@ function assignPlot(plotId, guildId, tier) {
     return { ok: false, error: 'Plot is already assigned', code: 'OCCUPIED' };
   }
 
-  // 3. Road adjacency
-  if (!isRoadAdjacent(plotId)) {
-    return { ok: false, error: 'Plot must be adjacent to a road', code: 'NO_ROAD_ACCESS' };
-  }
+  // 3. Road adjacency (soft — preferred but not required)
+  // Road-adjacent plots score higher but non-adjacent plots are allowed
 
   // 4. Tier limit
   const maxPlots = TIER_MAX_PLOTS[tier] || 1;
@@ -333,10 +331,10 @@ function getAvailablePlots(district, tier) {
   for (const key of districtTiles) {
     const [col, row] = key.split(',').map(Number);
 
-    // Skip occupied, non-road-adjacent, water
+    // Skip occupied, water, non-buildable
     if (assignments.has(key)) continue;
-    if (!map.roadAdjacent.has(key)) continue;
     if (map.water.has(key)) continue;
+    if (!isBuildable(key)) continue;
 
     // Check spacing
     if (getSpacingViolation(col, row, footprint)) continue;
@@ -350,24 +348,29 @@ function getAvailablePlots(district, tier) {
       if (!allOk) continue;
     }
 
-    // Score: prefer center of district, road proximity, spacing
+    // Score: prefer center of district with moderate road proximity
     const bounds = map.districtBounds[district];
     const distFromCenter = bounds
       ? Math.sqrt((col - bounds.centerCol) ** 2 + (row - bounds.centerRow) ** 2)
       : 10;
 
-    // Count adjacent roads (more = better visibility)
+    // Count adjacent roads
     let roadCount = 0;
     for (const [dc, dr] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
       if (map.roads.has(`${col + dc},${row + dr}`)) roadCount++;
     }
 
-    const score = 100 - distFromCenter * 2 + roadCount * 10;
+    // Scoring: heavily favor district center, mild road bonus
+    // Tiles 1-2 away from road = ideal (visible but not crammed on road)
+    const isRoadAdj = map.roadAdjacent.has(key);
+    const roadBonus = isRoadAdj ? 3 : 0;  // mild bonus, not dominant
+    const score = 100 - distFromCenter * 3 + roadBonus;
 
     const reasons = [];
-    if (map.roadAdjacent.has(key)) reasons.push('Road adjacent');
+    if (isRoadAdj) reasons.push('Road adjacent');
     if (roadCount >= 2) reasons.push(`${roadCount} road sides`);
     if (distFromCenter < 5) reasons.push('Near district center');
+    if (!isRoadAdj) reasons.push('Interior plot');
 
     available.push({ plotId: key, col, row, district, score: Math.round(score), reasons });
   }

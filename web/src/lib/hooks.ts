@@ -71,7 +71,7 @@ export function useGuildVisuals(): GuildVisual[] {
   const { data: guilds } = useGuilds();
   if (!guilds || guilds.length === 0) return [];
 
-  return guilds.map((g) => {
+  const visuals = guilds.map((g) => {
     const guildId = Number(g.guildId);
     const avgRating = typeof g.avgRating === 'string' ? parseFloat(g.avgRating) || 0 : g.avgRating;
     const position = getGuildPosition(guildId, g.category);
@@ -88,8 +88,11 @@ export function useGuildVisuals(): GuildVisual[] {
       agents: [],
       isAnimating: false,
       animationType: 'none' as const,
+      assignedPlot: g.assignedPlot ?? null,
     };
   });
+
+  return visuals;
 }
 
 /* ── Guild Agents (on-demand) ───────────────────────────────────── */

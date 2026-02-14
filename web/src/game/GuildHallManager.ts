@@ -88,8 +88,6 @@ export class GuildHallManager {
       console.warn('[GuildHallManager] updateGuildHalls skipped — no tilemapManager');
       return;
     }
-    // console.log('[GuildHallManager] updateGuildHalls', { count: guilds.length, existing: this.halls.length });
-
     const activeIds = new Set(guilds.map(g => g.guildId));
 
     // Remove halls for guilds no longer present
