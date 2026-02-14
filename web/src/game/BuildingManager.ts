@@ -6,23 +6,31 @@ import { GuildVisual, AgentVisual, getAgentTier } from '@/lib/world-state';
 /** Tier → footprint size (1x1 or 2x2) and base scale. */
 const TIER_CONFIG: Record<string, { footprint: number; scale: number }> = {
   tent:      { footprint: 1, scale: 0.35 },
-  shack:     { footprint: 1, scale: 0.40 },
-  house:     { footprint: 1, scale: 0.45 },
-  townhouse: { footprint: 1, scale: 0.50 },
+  shack:     { footprint: 1, scale: 0.55 },
+  house:     { footprint: 1, scale: 0.60 },
+  townhouse: { footprint: 1, scale: 0.55 },
   workshop:  { footprint: 2, scale: 0.55 },
-  tower:     { footprint: 2, scale: 0.60 },
-  landmark:  { footprint: 2, scale: 0.65 },
+  tower:     { footprint: 2, scale: 0.65 },
+  landmark:  { footprint: 2, scale: 0.75 },
 };
 
-/** Per-tier sprite keys (re-uses existing building sprites until custom tier art exists). */
+/**
+ * Per-tier sprite keys — 6-phase building progression:
+ * Phase 1 (tent):      Sailor tent
+ * Phase 2 (shack):     Small wooden shack
+ * Phase 3 (house):     Stone cottage with red roof
+ * Phase 4 (townhouse): Two-story stone/wood building
+ * Phase 5 (workshop):  Large stone workshop with lit windows
+ * Phase 6 (tower+):    Crystal tower / town hall
+ */
 const TIER_SPRITES: Record<string, string[]> = {
-  tent:      ['tent-hunter', 'tent-storagetent'],
-  shack:     ['tent-lumberjack', 'tent-pavilion'],
-  house:     ['bldg-herbary-empty', 'bldg-herbary-full'],
-  townhouse: ['bldg-barracks', 'bldg-church'],
-  workshop:  ['bldg-firestation', 'bldg-weaponsmith'],
-  tower:     ['bldg-signal-fire', 'bldg-church'],
-  landmark:  ['bldg-church', 'bldg-barracks'],
+  tent:      ['tent-hunter'],
+  shack:     ['custom-shack'],
+  house:     ['bldg-house'],
+  townhouse: ['custom-townhouse'],
+  workshop:  ['bldg-workshop'],
+  tower:     ['guild-townhall'],
+  landmark:  ['guild-townhall'],
 };
 
 interface PlacedBuilding {

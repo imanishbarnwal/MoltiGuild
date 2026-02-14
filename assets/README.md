@@ -137,6 +137,7 @@ This document specifies all visual assets needed for the RPG-style isometric wor
 | `lava-*.png` | Glowing orange-red lava flow | 4 (animated) |
 | `obsidian-*.png` | Smooth black volcanic glass | 4 |
 
+
 ### Transition Tiles (P1, 64x32 isometric)
 | Asset | Description | Count |
 |-------|-------------|-------|

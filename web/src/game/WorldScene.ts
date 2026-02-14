@@ -11,31 +11,6 @@ import { WorldState } from '@/lib/world-state';
 import { BIOME_CONFIG } from './BiomeConfig';
 import { seededRng } from './noise';
 
-/* ── Tree spritesheet frame definitions (pixel rects from 288x160 sheet) ── */
-const TREE_FRAME_DEFS = [
-  { name: 'tree-large-a', x: 0, y: 0, w: 108, h: 160 },  // full left tree incl. trunk
-  { name: 'tree-large-b', x: 105, y: 0, w: 108, h: 160 },  // full center tree incl. trunk
-  { name: 'tree-medium', x: 205, y: 0, w: 52, h: 85 },  // medium round tree
-  { name: 'tree-conifer', x: 258, y: 88, w: 28, h: 62 },  // small pine/conifer
-  { name: 'tree-dead', x: 258, y: 25, w: 28, h: 62 },  // bare brown trunk
-  { name: 'bush-a', x: 210, y: 82, w: 34, h: 34 },  // round green bush
-  { name: 'bush-b', x: 244, y: 56, w: 34, h: 34 },  // yellow-green bush
-];
-
-/* ── Per-biome building sprite keys for themed scattering ─────────── */
-const BIOME_STRUCTURES: Record<string, string[]> = {
-  creative:    ['bldg-herbary-empty', 'bldg-herbary-full', 'tent-pavilion', 'tent-storagetent'],
-  townsquare:  ['bldg-church', 'bldg-barracks', 'bldg-signal-fire', 'bldg-firestation'],
-  translation: ['tent-hunter', 'tent-storagetent', 'tent-lumberjack', 'tent-pavilion'],
-  defi:        ['bldg-firestation', 'bldg-weaponsmith', 'bldg-signal-fire', 'bldg-barracks'],
-  research:    ['bldg-herbary-full', 'bldg-church', 'bldg-herbary-empty', 'tent-pavilion'],
-  code:        ['bldg-barracks', 'bldg-weaponsmith', 'bldg-firestation', 'bldg-signal-fire'],
-};
-
-/* DISTRICT_GRIDS removed — districts are now organic Voronoi shapes in TilemapManager */
-
-/* seededRng imported from noise.ts */
-
 /** Number of tile variants per biome / terrain type. */
 const TILE_VARIANT_COUNT = 4;
 
@@ -51,43 +26,85 @@ export class WorldScene extends Phaser.Scene {
   private buildingPositions: { gx: number; gy: number }[] = [];
   private buildingSprites: Phaser.GameObjects.Image[] = [];
   private waterSprites: Phaser.GameObjects.Image[] = [];
+  private debugEl: HTMLDivElement | null = null;
+  /** Maps "col,row" → list of asset keys placed on that tile (for debug overlay). */
+  private tileAssets: Map<string, string[]> = new Map();
 
   constructor() {
     super({ key: 'WorldScene' });
   }
 
   preload(): void {
-    this.load.image('creative-quarter', '/creative-quarter.png');
-
     // Sailor tents for DeFi Docks
     this.load.image('tent-hunter', '/sailor-tents/hunter/as_hunter0/idle/225/0.png');
     this.load.image('tent-lumberjack', '/sailor-tents/lumberjack/as_lumberjack0/idle/225/0.png');
     this.load.image('tent-pavilion', '/sailor-tents/pavilion/as_pavilion0/idle/225/0.png');
     this.load.image('tent-storagetent', '/sailor-tents/storagetent/as_storagetent0/idle/225/0.png');
 
-    // Isometric Building Pack – all idle variants
-    const bp = '/Isometric%20Building%20Pack';
-    this.load.image('bldg-barracks', `${bp}/barracks/renders/idle/225/000.png`);
-    this.load.image('bldg-church', `${bp}/church/renders/idle/225/000.png`);
-    this.load.image('bldg-firestation', `${bp}/firestation/renders/idle/225/000.png`);
-    this.load.image('bldg-herbary-empty', `${bp}/herbary/renders/idle_empty/225/000.png`);
-    this.load.image('bldg-herbary-full', `${bp}/herbary/renders/idle_full/225/000.png`);
-    this.load.image('bldg-signal-fire', `${bp}/signal_fire/renders/idle/225/000.png`);
-    this.load.image('bldg-weaponsmith', `${bp}/weaponsmith/renders/idle/225/000.png`);
+    // Isometric Building Pack (extracted PNGs)
+    this.load.image('bldg-barracks', '/buildings/barracks.png');
+    this.load.image('bldg-church', '/buildings/church.png');
+    this.load.image('bldg-firestation', '/buildings/firestation.png');
+    this.load.image('bldg-herbary-full', '/buildings/herbary-full.png');
+    this.load.image('bldg-signal-fire', '/buildings/signal-fire.png');
+    this.load.image('bldg-weaponsmith', '/buildings/weaponsmith.png');
+
+    // ── Custom MoltiGuild building sprites ──
+    const mg = '/moltiguild-assets';
+    this.load.image('custom-shack', `${mg}/shack.png`);
+    this.load.image('custom-townhouse', `${mg}/townhouse.png`);
+    this.load.image('custom-workshop', `${mg}/workshop.png`);
+
+    // ── Custom tile textures ──
+    this.load.image('tile-cobblestone', `${mg}/cobblestone.png`);
+    this.load.image('tile-road', `${mg}/road-tile.png`);
+    this.load.image('tile-sand', `${mg}/sand-tile.png`);
+    this.load.image('tile-ocean', `${mg}/ocean-tile.png`);
+    this.load.image('tile-lava', `${mg}/lava-tile.png`);
+    this.load.image('tile-lava-base', `${mg}/lava-base.png`);
+    this.load.image('tile-lava-crust', `${mg}/lava-crust.png`);
+    this.load.image('tile-lava-center', `${mg}/lava-tile-center.png`);
+    this.load.image('tile-meadow-grass', `${mg}/meadow-grass.png`);
+    this.load.image('tile-meadow-flowers', `${mg}/meadow-flowers.png`);
+    this.load.image('tile-mountain', `${mg}/mountain-tile.png`);
+    this.load.image('tile-ark-rock', `${mg}/ark-rock-tile.png`);
+    this.load.image('tile-mystic-stone', `${mg}/mystic-stone.png`);
+    this.load.image('tile-mountain-peak', `${mg}/mountain-peak.png`);
+
+    // ── Agent tier building sprites ──
+    this.load.image('bldg-house', `${mg}/Gemini_Generated_Image_oilkw8oilkw8oilk%20Background%20Removed.png`);
+    this.load.image('bldg-workshop', `${mg}/workshop%20Background%20Removed.png`);
+
+    // ── Custom decoration sprites ──
+    this.load.image('deco-fountain', `${mg}/fountain.png`);
+    this.load.image('deco-lamp-post', `${mg}/lamp-post.png`);
+    this.load.image('deco-blossom-tree', `${mg}/blossom-tree.png`);
+    this.load.image('deco-crystal', `${mg}/crystal.png`);
+    this.load.image('deco-fishing-boat', `${mg}/fishing-boat.png`);
+    this.load.image('deco-pond-center', `${mg}/pond-center.png`);
+    this.load.image('deco-pond-left', `${mg}/pond-left.png`);
+    this.load.image('deco-pond-right', `${mg}/pond-right.png`);
+
+    // ── Custom guild hall sprites ──
+    const pg = '/pngs';
+    this.load.image('guild-bronze', `${pg}/simple%20wooden%20guild%20hall%20Background%20Removed.png`);
+    this.load.image('guild-silver', `${pg}/stone%20guild%20hall%20Background%20Removed.png`);
+    this.load.image('guild-gold', `${pg}/grand%20guild%20citadel%20Background%20Removed.png`);
+    this.load.image('guild-diamond', `${pg}/Massive%20cathedral%20like%20guild%20hall%20Background%20Removed.png`);
+
+    // ── Custom guild-related sprites ──
+    this.load.image('guild-townhall', `${pg}/town%20hall%20Background%20Removed.png`);
+    this.load.image('guild-ornate', `${pg}/ornate%20architecture%20(1)%20Background%20Removed.png`);
+    this.load.image('guild-cathedral', `${pg}/Gemini_Generated_Image_ok4w08ok4w08ok4w%20Background%20Removed.png`);
 
     // Grass tile texture (dark variant)
     this.load.image('grass-dark', '/grass/tilable-IMG_0044-dark.png');
-
-    // Trees & bushes spritesheet
-    this.load.image('trees-sheet', '/trees_and_bushes_pack/trees_and_bushes_pack/trees-and-bushes.png');
   }
 
   create(): void {
-    // Create programmatic textures
+    // Create programmatic textures (grass fallback, water, shadow)
     this.createGrassTileTextures();
-    this.createBiomeTileTextures();
     this.createWaterTileTextures();
-    this.createRoadTileTextures();
     this.createShadowTexture();
 
     // Background gradient (depth -10, fixed to camera)
@@ -105,31 +122,36 @@ export class WorldScene extends Phaser.Scene {
     // Lay terrain tiles per biome (depth 0, below district color overlay)
     this.placeTerrainTiles();
 
-    // Scatter random tent/building structures across all districts
-    this.scatterStructures();
+    // Scatter mountain peaks across Code Heights
+    this.placeTranslationMountains();
 
-    // Extract tree frames from spritesheet and scatter trees
-    this.extractTreeFrames();
-    this.treeManager = new TreeManager(this, this.tilemapManager, this.buildingPositions);
-    this.treeManager.scatter();
+    // Lava gradient in DeFi Docks (center stream → outward cooling)
+    this.placeDefiLavaGradient();
 
-    // Wire building manager dependencies for tier footprint system
-    this.buildingManager.setDependencies(this.tilemapManager, this.treeManager);
+    // Scatter lamp posts across all districts
+    this.scatterLampPosts();
 
-    // Guild hall manager — places 1 building per guild in the world
-    this.guildHallManager = new GuildHallManager(this);
-    this.guildHallManager.setDependencies(this.tilemapManager, this.treeManager);
+    // Scatter crystals across Research Fields
+    this.scatterResearchCrystals();
 
-    // Place natural feature decorations per biome
-    this.placeNaturalFeatures();
+    // Scatter fishing boats on Translation Ward ocean
+    this.scatterTranslationBoats();
 
-    // Ambient dust particles across the world center
-    const worldCenterX = this.tilemapManager.townSquareCenterScreen.x;
-    const worldCenterY = this.tilemapManager.townSquareCenterScreen.y;
-    this.particleManager.createDustEmitter(worldCenterX, worldCenterY);
+    // Scatter blossom trees across Creative Quarter
+    this.scatterBlossomTrees();
 
-    // Biome-specific particles
-    this.particleManager.createBiomeEmitters(this.tilemapManager);
+    // Fountain at Town Square center
+    const tsCenter = this.tilemapManager.getDistrictCenter('townsquare');
+    if (tsCenter) {
+      const tsBounds = this.tilemapManager.getDistrictBounds('townsquare');
+      const depth = tsBounds ? 6 + (tsBounds.centerCol + tsBounds.centerRow) * 0.01 : 6;
+
+      const fountain = this.add.image(tsCenter.x, tsCenter.y, 'deco-fountain');
+      fountain.setOrigin(0.5, 0.7);
+      fountain.setScale(0.65);
+      fountain.setDepth(depth);
+      if (tsBounds) this.trackAsset(tsBounds.centerCol, tsBounds.centerRow, 'deco-fountain');
+    }
 
     // Minimap (pass building positions for dot markers)
     this.minimapManager = new MinimapManager(this, this.tilemapManager, this.buildingPositions);
@@ -156,16 +178,17 @@ export class WorldScene extends Phaser.Scene {
         this, this.cameras.main, this.tilemapManager, this.minimapManager,
         (districtCategory) => {
           this.cameraController.enable();
-          this.setBuildingsInteractive(true);
           console.log('Entered district:', districtCategory);
         },
         () => {
           this.cameraController.disable();
-          this.setBuildingsInteractive(false);
           console.log('Returned to overview');
         },
       );
     }
+
+    // HTML debug overlay (outside Phaser canvas)
+    this.createDebugOverlay();
 
     // Signal to React bridge that scene is fully created and ready for worldState
     this.game.events.emit('scene-created');
@@ -173,6 +196,39 @@ export class WorldScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     this.cinematicIntro?.update(_time, delta);
+
+    // Update HTML debug overlay
+    if (this.debugEl && this.tilemapManager) {
+      const pointer = this.input.activePointer;
+      const cell = this.tilemapManager.screenToGrid(pointer.worldX, pointer.worldY);
+      const tsCenter = this.tilemapManager.townSquareCenterScreen;
+
+      if (cell) {
+        const key = `${cell.col},${cell.row}`;
+        const assets = this.tileAssets.get(key);
+        const assetStr = assets && assets.length > 0 ? assets.join(', ') : 'none';
+        const biome = this.tilemapManager.getDistrictBiome(cell.col, cell.row) ?? '—';
+        this.debugEl.textContent = `Tile: (${cell.col}, ${cell.row})  |  Biome: ${biome}  |  Assets: ${assetStr}`;
+      } else {
+        this.debugEl.textContent = `Tile: —`;
+      }
+    }
+  }
+
+  /** Record an asset key placed on a grid tile for the debug overlay. */
+  private trackAsset(col: number, row: number, assetKey: string): void {
+    const k = `${col},${row}`;
+    const list = this.tileAssets.get(k);
+    if (list) list.push(assetKey);
+    else this.tileAssets.set(k, [assetKey]);
+  }
+
+  private createDebugOverlay(): void {
+    const el = document.createElement('div');
+    el.id = 'phaser-debug';
+    el.style.cssText = 'position:fixed;top:8px;left:8px;z-index:9999;font:13px/1.4 monospace;color:#00ff88;background:rgba(0,0,0,0.75);padding:6px 10px;border-radius:4px;pointer-events:none;';
+    document.body.appendChild(el);
+    this.debugEl = el;
   }
 
   /**
@@ -209,111 +265,15 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  /** Create programmatic biome terrain tile textures (4 variants per biome). */
-  private createBiomeTileTextures(): void {
-    const hw = TILE_WIDTH / 2;
-    const hh = TILE_HEIGHT / 2;
-    const rand = seededRng(1337);
-
-    for (const biomeName of BIOME_NAMES) {
-      const biome = BIOME_CONFIG[biomeName];
-      if (!biome) continue;
-
-      for (let vi = 0; vi < TILE_VARIANT_COUNT; vi++) {
-        const texKey = `biome-${biomeName}-${vi}`;
-        const canvasTex = this.textures.createCanvas(texKey, TILE_WIDTH, TILE_HEIGHT);
-        if (!canvasTex) continue;
-
-        const ctx = canvasTex.context;
-
-        // Clip to isometric diamond
-        ctx.beginPath();
-        ctx.moveTo(hw, 0);
-        ctx.lineTo(TILE_WIDTH, hh);
-        ctx.lineTo(hw, TILE_HEIGHT);
-        ctx.lineTo(0, hh);
-        ctx.closePath();
-        ctx.clip();
-
-        // Fill base color
-        ctx.fillStyle = biome.primaryColors[vi % biome.primaryColors.length];
-        ctx.fillRect(0, 0, TILE_WIDTH, TILE_HEIGHT);
-
-        // Add noise pattern — different per biome type
-        const accentCount = 8 + Math.floor(rand() * 8);
-        for (let i = 0; i < accentCount; i++) {
-          const ax = rand() * TILE_WIDTH;
-          const ay = rand() * TILE_HEIGHT;
-          const color = biome.accentColors[Math.floor(rand() * biome.accentColors.length)];
-          const size = 1 + rand() * 3;
-
-          ctx.fillStyle = color;
-          ctx.globalAlpha = 0.3 + rand() * 0.4;
-          ctx.beginPath();
-          ctx.arc(ax, ay, size, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        ctx.globalAlpha = 1;
-
-        // Add biome-specific details
-        if (biomeName === 'townsquare') {
-          // Cobblestone grid lines
-          ctx.strokeStyle = biome.accentColors[0];
-          ctx.lineWidth = 0.5;
-          ctx.globalAlpha = 0.3;
-          for (let g = 8; g < TILE_WIDTH; g += 12) {
-            ctx.beginPath();
-            ctx.moveTo(g, 0);
-            ctx.lineTo(g, TILE_HEIGHT);
-            ctx.stroke();
-          }
-          for (let g = 6; g < TILE_HEIGHT; g += 8) {
-            ctx.beginPath();
-            ctx.moveTo(0, g);
-            ctx.lineTo(TILE_WIDTH, g);
-            ctx.stroke();
-          }
-          ctx.globalAlpha = 1;
-        } else if (biomeName === 'defi') {
-          // Lava vein crack lines
-          ctx.strokeStyle = biome.accentColors[0];
-          ctx.lineWidth = 1;
-          ctx.globalAlpha = 0.4;
-          const startX = rand() * TILE_WIDTH;
-          const startY = rand() * TILE_HEIGHT;
-          ctx.beginPath();
-          ctx.moveTo(startX, startY);
-          for (let s = 0; s < 3; s++) {
-            ctx.lineTo(startX + (rand() - 0.5) * 30, startY + (rand() - 0.5) * 20);
-          }
-          ctx.stroke();
-          ctx.globalAlpha = 1;
-        } else if (biomeName === 'code') {
-          // Snow flecks
-          for (let s = 0; s < 5; s++) {
-            ctx.fillStyle = biome.accentColors[Math.floor(rand() * biome.accentColors.length)];
-            ctx.globalAlpha = 0.2 + rand() * 0.3;
-            ctx.fillRect(rand() * TILE_WIDTH, rand() * TILE_HEIGHT, 2 + rand() * 3, 1 + rand() * 2);
-          }
-          ctx.globalAlpha = 1;
-        } else if (biomeName === 'research') {
-          // Subtle teal sparkle dots
-          for (let s = 0; s < 3; s++) {
-            ctx.fillStyle = biome.accentColors[1]; // teal
-            ctx.globalAlpha = 0.15 + rand() * 0.2;
-            const sx = rand() * TILE_WIDTH;
-            const sy = rand() * TILE_HEIGHT;
-            ctx.beginPath();
-            ctx.arc(sx, sy, 1.5, 0, Math.PI * 2);
-            ctx.fill();
-          }
-          ctx.globalAlpha = 1;
-        }
-
-        canvasTex.refresh();
-      }
-    }
-  }
+  /** Biome → tile image keys (assets are already isometric, used directly). */
+  private static readonly BIOME_TILE_KEYS: Record<string, string[]> = {
+    townsquare:  ['tile-cobblestone'],
+    defi:        ['tile-ark-rock'],
+    creative:    ['tile-meadow-grass'],
+    code:        ['tile-mountain'],
+    research:    ['tile-mystic-stone'],
+    translation: ['tile-sand'],
+  };
 
   /** Create water/liquid tile textures per biome. */
   private createWaterTileTextures(): void {
@@ -365,44 +325,7 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  /** Create road tile textures (brown/grey cobblestone). */
-  private createRoadTileTextures(): void {
-    const hw = TILE_WIDTH / 2;
-    const hh = TILE_HEIGHT / 2;
-    const rand = seededRng(5555);
-
-    for (let vi = 0; vi < TILE_VARIANT_COUNT; vi++) {
-      const texKey = `road-tile-${vi}`;
-      const canvasTex = this.textures.createCanvas(texKey, TILE_WIDTH, TILE_HEIGHT);
-      if (!canvasTex) continue;
-
-      const ctx = canvasTex.context;
-      ctx.beginPath();
-      ctx.moveTo(hw, 0);
-      ctx.lineTo(TILE_WIDTH, hh);
-      ctx.lineTo(hw, TILE_HEIGHT);
-      ctx.lineTo(0, hh);
-      ctx.closePath();
-      ctx.clip();
-
-      // Dark road base
-      const baseColors = ['#504838', '#484030', '#4c4438', '#504840'];
-      ctx.fillStyle = baseColors[vi];
-      ctx.fillRect(0, 0, TILE_WIDTH, TILE_HEIGHT);
-
-      // Stone pattern
-      ctx.fillStyle = '#605848';
-      ctx.globalAlpha = 0.4;
-      for (let s = 0; s < 6; s++) {
-        const sx = rand() * TILE_WIDTH;
-        const sy = rand() * TILE_HEIGHT;
-        ctx.fillRect(sx, sy, 4 + rand() * 6, 3 + rand() * 4);
-      }
-      ctx.globalAlpha = 1;
-
-      canvasTex.refresh();
-    }
-  }
+  // Road tile uses 'tile-road' image directly (already isometric) — no canvas needed
 
   /** Create an elliptical drop-shadow canvas texture. */
   private createShadowTexture(): void {
@@ -421,100 +344,6 @@ export class WorldScene extends Phaser.Scene {
     tex.refresh();
   }
 
-  /**
-   * Extract tree frames from the spritesheet and remove the grass background
-   * using edge-connected flood fill. This only removes background pixels that
-   * are reachable from the frame edges, so it never punches holes in canopies.
-   */
-  private extractTreeFrames(): void {
-    const srcImage = this.textures.get('trees-sheet').getSourceImage() as HTMLImageElement;
-
-    // Sample the grass background color from the top-left corner of the sheet
-    const sampleCanvas = document.createElement('canvas');
-    sampleCanvas.width = srcImage.width;
-    sampleCanvas.height = srcImage.height;
-    const sampleCtx = sampleCanvas.getContext('2d')!;
-    sampleCtx.drawImage(srcImage, 0, 0);
-    const cornerPixel = sampleCtx.getImageData(0, 0, 1, 1).data;
-    const bgR = cornerPixel[0], bgG = cornerPixel[1], bgB = cornerPixel[2];
-
-    for (const frame of TREE_FRAME_DEFS) {
-      const canvasTex = this.textures.createCanvas(frame.name, frame.w, frame.h);
-      if (!canvasTex) continue;
-
-      const ctx = canvasTex.context;
-      ctx.drawImage(srcImage, frame.x, frame.y, frame.w, frame.h, 0, 0, frame.w, frame.h);
-
-      const imageData = ctx.getImageData(0, 0, frame.w, frame.h);
-      const data = imageData.data;
-      const w = frame.w;
-      const h = frame.h;
-
-      // Check if a pixel looks like the grass background (color distance)
-      const isBackground = (idx: number): boolean => {
-        const r = data[idx * 4];
-        const g = data[idx * 4 + 1];
-        const b = data[idx * 4 + 2];
-        // Color distance from sampled background
-        const dr = r - bgR, dg = g - bgG, db = b - bgB;
-        const dist = Math.sqrt(dr * dr + dg * dg + db * db);
-        return dist < 55; // tolerance for grass texture variation
-      };
-
-      // Flood fill from all edge pixels
-      const transparent = new Uint8Array(w * h);
-      const queue: number[] = [];
-
-      // Seed edges
-      for (let x = 0; x < w; x++) {
-        queue.push(x);                // top
-        queue.push((h - 1) * w + x);  // bottom
-      }
-      for (let y = 1; y < h - 1; y++) {
-        queue.push(y * w);            // left
-        queue.push(y * w + (w - 1));  // right
-      }
-
-      let qi = 0;
-      while (qi < queue.length) {
-        const idx = queue[qi++];
-        if (idx < 0 || idx >= w * h || transparent[idx]) continue;
-
-        if (!isBackground(idx)) continue;
-
-        transparent[idx] = 1;
-        data[idx * 4 + 3] = 0; // set alpha to 0
-
-        const x = idx % w;
-        const y = (idx - x) / w;
-        if (x > 0) queue.push(idx - 1);
-        if (x < w - 1) queue.push(idx + 1);
-        if (y > 0) queue.push(idx - w);
-        if (y < h - 1) queue.push(idx + w);
-      }
-
-      // Soften edges: partially transparent border pixels next to removed ones
-      for (let y = 0; y < h; y++) {
-        for (let x = 0; x < w; x++) {
-          const idx = y * w + x;
-          if (transparent[idx]) continue; // already removed
-          // Check if any neighbor was removed
-          const hasTransparentNeighbor =
-            (x > 0 && transparent[idx - 1]) ||
-            (x < w - 1 && transparent[idx + 1]) ||
-            (y > 0 && transparent[idx - w]) ||
-            (y < h - 1 && transparent[idx + w]);
-          if (hasTransparentNeighbor) {
-            data[idx * 4 + 3] = Math.floor(data[idx * 4 + 3] * 0.5);
-          }
-        }
-      }
-
-      ctx.putImageData(imageData, 0, 0);
-      canvasTex.refresh();
-    }
-  }
-
   /** Background is handled by Phaser config backgroundColor — no overlay needed. */
   private createBackgroundGradient(): void {
     // Intentionally empty — the Phaser canvas backgroundColor (#1a1a2a)
@@ -522,66 +351,79 @@ export class WorldScene extends Phaser.Scene {
     // A previous radial gradient overlay created a visible "box" artifact.
   }
 
-  /** Set up camera PostFX: vignette + warm golden tint (WebGL only). */
+  /** Set up camera PostFX: dark medieval atmosphere (WebGL only). */
   private setupPostFX(): void {
     const cam = this.cameras.main;
     if (!cam.postFX) return; // Canvas renderer — skip GPU effects
 
-    // Extremely subtle vignette — barely visible for better initial visibility
-    cam.postFX.addVignette(0.5, 0.5, 0.95, 0.01);
+    // Moderate vignette — dark edges for medieval feel
+    cam.postFX.addVignette(0.5, 0.5, 0.75, 0.30);
 
-    // Brighter scene with warm tint — improved visibility on load
+    // Slightly desaturated + dimmed for a medieval look
     const colorMatrix = cam.postFX.addColorMatrix();
-    colorMatrix.brightness(1.15);
-    // Minimal warm shift: keep greens vibrant
+    colorMatrix.brightness(0.88);
+    colorMatrix.saturate(-0.18);
+    // Warm shadow tint: subtle sepia push
     const m = colorMatrix.getData();
-    m[0] += 0.05;   // R → R slight warmth
-    m[6] += 0.03;   // G → G tiny boost
-    m[12] -= 0.01;  // B → B slight reduction
+    m[0] += 0.03;    // R → R slight warmth
+    m[6] -= 0.01;    // G → G slight mute
+    m[12] -= 0.04;   // B → B pull down for amber shadows
     colorMatrix.set(m);
   }
 
-  /** Place biome-appropriate terrain tiles across the entire world. */
+  /** Place biome-appropriate terrain tiles across the entire world.
+   *  All custom tile assets are already isometric — placed directly, no canvas clipping. */
   private placeTerrainTiles(): void {
+    // Tile images are now exactly 64x32 — no scaling needed, placed at 1:1
+
     for (let row = 0; row < GRID_ROWS; row++) {
       for (let col = 0; col < GRID_COLS; col++) {
-        // Skip tiles outside the organic world boundary
         if (!this.tilemapManager.isInWorld(col, row)) continue;
 
         const pos = this.tilemapManager.gridToScreen(col, row);
         const vi = (col + row * 3) % TILE_VARIANT_COUNT;
-
         const biome = this.tilemapManager.getDistrictBiome(col, row);
-        let texKey: string;
 
         if (biome && this.tilemapManager.isWater(col, row)) {
-          // Water/lava tile
-          texKey = `water-${biome}-${vi}`;
-          // Fallback if this biome has no water textures
-          if (!this.textures.exists(texKey)) texKey = `biome-${biome}-${vi}`;
-
-          const sprite = this.add.image(pos.x, pos.y, texKey);
-          sprite.setOrigin(0.5, 0.5);
-          sprite.setDepth(0);
-          this.waterSprites.push(sprite);
+          // Water tiles — use ocean-tile for translation, programmatic for others
+          if (biome === 'translation') {
+            const sprite = this.add.image(pos.x, pos.y, 'tile-ocean');
+            sprite.setOrigin(0.5, 0.5);
+            sprite.setDepth(0);
+            this.waterSprites.push(sprite);
+            this.trackAsset(col, row, 'tile-ocean');
+          } else {
+            let texKey = `water-${biome}-${vi}`;
+            if (!this.textures.exists(texKey)) texKey = `grass-tile-${vi}`;
+            const sprite = this.add.image(pos.x, pos.y, texKey);
+            sprite.setOrigin(0.5, 0.5);
+            sprite.setDepth(0);
+            this.waterSprites.push(sprite);
+            this.trackAsset(col, row, texKey);
+          }
         } else if (biome) {
-          // Biome terrain tile
-          texKey = `biome-${biome}-${vi}`;
-          const sprite = this.add.image(pos.x, pos.y, texKey);
-          sprite.setOrigin(0.5, 0.5);
-          sprite.setDepth(0);
+          // Use real tile image directly (64x32, already isometric)
+          const tileKeys = WorldScene.BIOME_TILE_KEYS[biome];
+          if (tileKeys && tileKeys.length > 0) {
+            const key = tileKeys[vi % tileKeys.length];
+            const sprite = this.add.image(pos.x, pos.y, key);
+            sprite.setOrigin(0.5, 0.5);
+            sprite.setDepth(0);
+            this.trackAsset(col, row, key);
+          }
         } else if (this.tilemapManager.isRoad(col, row)) {
-          // Road tile
-          texKey = `road-tile-${vi}`;
-          const sprite = this.add.image(pos.x, pos.y, texKey);
+          // Road tile (64x32, already isometric)
+          const sprite = this.add.image(pos.x, pos.y, 'tile-road');
           sprite.setOrigin(0.5, 0.5);
           sprite.setDepth(0);
+          this.trackAsset(col, row, 'tile-road');
         } else {
-          // Default grass for non-district, non-road tiles
-          texKey = `grass-tile-${vi}`;
+          // Default grass fallback
+          const texKey = `grass-tile-${vi}`;
           const sprite = this.add.image(pos.x, pos.y, texKey);
           sprite.setOrigin(0.5, 0.5);
           sprite.setDepth(0);
+          this.trackAsset(col, row, texKey);
         }
       }
     }
@@ -599,238 +441,479 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  /** Place biome-specific natural feature decorations using organic tile sets. */
-  private placeNaturalFeatures(): void {
-    const rand = seededRng(9999);
+  /**
+   * Place dense mountain-peak clusters across Code Heights.
+   * First picks group centers spread across the district, then fills
+   * nearby tiles around each center for a dense, grouped look.
+   */
+  private placeTranslationMountains(): void {
+    const rand = seededRng(7777);
+    const tiles = this.tilemapManager.getDistrictTiles('code');
+    if (!tiles || tiles.size === 0) return;
 
-    /** Pick N random tiles from a district's tile set. */
-    const pickTiles = (category: string, count: number): { col: number; row: number }[] => {
-      const tiles = this.tilemapManager.getDistrictTiles(category);
-      if (!tiles || tiles.size === 0) return [];
-      const arr = Array.from(tiles).map(k => {
-        const [c, r] = k.split(',').map(Number);
-        return { col: c, row: r };
-      });
-      const result: { col: number; row: number }[] = [];
-      for (let i = 0; i < count && arr.length > 0; i++) {
-        const idx = Math.floor(rand() * arr.length);
-        result.push(arr[idx]);
-        arr.splice(idx, 1);
-      }
-      return result;
-    };
+    const tileSet = new Set(tiles);
+    const tileArr = Array.from(tiles).map(k => {
+      const [c, r] = k.split(',').map(Number);
+      return { col: c, row: r };
+    });
 
-    for (const category of BIOME_NAMES) {
-      switch (category) {
-        case 'code': {
-          this.createMountainTexture();
-          const bounds = this.tilemapManager.getDistrictBounds('code');
-          if (!bounds) break;
-          // Pick tiles near the top (low row) of the district for mountain peaks
-          const tiles = pickTiles('code', 12).filter(t => t.row <= bounds.centerRow - 1);
-          for (const t of tiles.slice(0, 4)) {
-            const pos = this.tilemapManager.gridToScreen(t.col, t.row);
-            const sprite = this.add.image(pos.x, pos.y - 10, 'feature-mountain');
-            sprite.setOrigin(0.5, 0.8);
-            sprite.setScale(0.6 + rand() * 0.3);
-            sprite.setDepth(5 + (t.col + t.row) * 0.01);
-            sprite.setAlpha(0.8);
-          }
-          break;
-        }
-        case 'research': {
-          this.createCrystalTexture();
-          for (const t of pickTiles('research', 6)) {
-            if (this.tilemapManager.isWater(t.col, t.row)) continue;
-            const pos = this.tilemapManager.gridToScreen(t.col, t.row);
-            const sprite = this.add.image(pos.x, pos.y, 'feature-crystal');
-            sprite.setOrigin(0.5, 0.8);
-            sprite.setScale(0.5 + rand() * 0.4);
-            sprite.setDepth(6 + (t.col + t.row) * 0.01);
-            sprite.setAlpha(0.7 + rand() * 0.3);
-          }
-          break;
-        }
-        case 'townsquare': {
-          this.createFountainTexture();
-          const center = this.tilemapManager.getDistrictCenter('townsquare');
-          if (!center) break;
-          const sprite = this.add.image(center.x, center.y, 'feature-fountain');
-          sprite.setOrigin(0.5, 0.7);
-          sprite.setScale(0.7);
-          const bounds = this.tilemapManager.getDistrictBounds('townsquare');
-          const depth = bounds ? 6 + (bounds.centerCol + bounds.centerRow) * 0.01 : 6;
-          sprite.setDepth(depth);
-          break;
-        }
-        case 'creative': {
-          this.createFlowerTexture();
-          for (const t of pickTiles('creative', 12)) {
-            if (this.tilemapManager.isWater(t.col, t.row)) continue;
-            const pos = this.tilemapManager.gridToScreen(t.col, t.row);
-            const sprite = this.add.image(pos.x + (rand() - 0.5) * 20, pos.y + (rand() - 0.5) * 10, 'feature-flower');
-            sprite.setOrigin(0.5, 0.5);
-            sprite.setScale(0.3 + rand() * 0.3);
-            sprite.setDepth(0.5);
-            sprite.setAlpha(0.7 + rand() * 0.3);
-          }
-          break;
+    // Sort then shuffle for deterministic group center selection
+    tileArr.sort((a, b) => a.col - b.col || a.row - b.row);
+    for (let i = tileArr.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [tileArr[i], tileArr[j]] = [tileArr[j], tileArr[i]];
+    }
+
+    // Pick 4 group centers, well-spaced across the district
+    const GROUP_COUNT = 4;
+    const GROUP_MIN_DIST_SQ = 6 * 6;
+    const groupCenters: { col: number; row: number }[] = [];
+
+    for (const tile of tileArr) {
+      if (groupCenters.length >= GROUP_COUNT) break;
+      if (this.tilemapManager.isWater(tile.col, tile.row)) continue;
+      if (this.tilemapManager.isRoad(tile.col, tile.row)) continue;
+
+      // Ensure group center is far enough from roads so cluster won't overlap
+      let nearRoad = false;
+      for (let dc = -3; dc <= 3 && !nearRoad; dc++) {
+        for (let dr = -3; dr <= 3 && !nearRoad; dr++) {
+          if (this.tilemapManager.isRoad(tile.col + dc, tile.row + dr)) nearRoad = true;
         }
       }
+      if (nearRoad) continue;
+
+      const tooClose = groupCenters.some(
+        p => (p.col - tile.col) ** 2 + (p.row - tile.row) ** 2 < GROUP_MIN_DIST_SQ,
+      );
+      if (tooClose) continue;
+      groupCenters.push(tile);
     }
-  }
 
-  private createMountainTexture(): void {
-    if (this.textures.exists('feature-mountain')) return;
-    const w = 64, h = 48;
-    const tex = this.textures.createCanvas('feature-mountain', w, h);
-    if (!tex) return;
-    const ctx = tex.context;
-    // Grey mountain peak with snow cap
-    ctx.fillStyle = '#707880';
-    ctx.beginPath();
-    ctx.moveTo(w / 2, 4);
-    ctx.lineTo(w - 8, h);
-    ctx.lineTo(8, h);
-    ctx.closePath();
-    ctx.fill();
-    // Snow cap
-    ctx.fillStyle = '#e0e8f0';
-    ctx.beginPath();
-    ctx.moveTo(w / 2, 4);
-    ctx.lineTo(w / 2 + 12, 18);
-    ctx.lineTo(w / 2 - 12, 18);
-    ctx.closePath();
-    ctx.fill();
-    tex.refresh();
-  }
+    // For each group center, place a dense cluster of 5–7 peaks on nearby tiles
+    const placed = new Set<string>();
+    for (const center of groupCenters) {
+      const CLUSTER_RADIUS = 2;
+      const peaksInCluster = 5 + Math.floor(rand() * 3); // 5–7
+      let count = 0;
 
-  private createCrystalTexture(): void {
-    if (this.textures.exists('feature-crystal')) return;
-    const w = 24, h = 36;
-    const tex = this.textures.createCanvas('feature-crystal', w, h);
-    if (!tex) return;
-    const ctx = tex.context;
-    // Purple crystal
-    ctx.fillStyle = '#8a60c0';
-    ctx.beginPath();
-    ctx.moveTo(w / 2, 0);
-    ctx.lineTo(w - 2, h * 0.6);
-    ctx.lineTo(w / 2, h);
-    ctx.lineTo(2, h * 0.6);
-    ctx.closePath();
-    ctx.fill();
-    // Highlight facet
-    ctx.fillStyle = '#b090e0';
-    ctx.globalAlpha = 0.5;
-    ctx.beginPath();
-    ctx.moveTo(w / 2, 0);
-    ctx.lineTo(w / 2 + 6, h * 0.4);
-    ctx.lineTo(w / 2, h * 0.7);
-    ctx.closePath();
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    tex.refresh();
-  }
+      // Gather nearby candidate tiles within radius
+      const candidates: { col: number; row: number }[] = [];
+      for (let dc = -CLUSTER_RADIUS; dc <= CLUSTER_RADIUS; dc++) {
+        for (let dr = -CLUSTER_RADIUS; dr <= CLUSTER_RADIUS; dr++) {
+          const c = center.col + dc;
+          const r = center.row + dr;
+          const k = `${c},${r}`;
+          if (!tileSet.has(k)) continue;
+          if (placed.has(k)) continue;
+          if (this.tilemapManager.isWater(c, r)) continue;
+          if (this.tilemapManager.isRoad(c, r)) continue;
+          candidates.push({ col: c, row: r });
+        }
+      }
 
-  private createFountainTexture(): void {
-    if (this.textures.exists('feature-fountain')) return;
-    const w = 32, h = 32;
-    const tex = this.textures.createCanvas('feature-fountain', w, h);
-    if (!tex) return;
-    const ctx = tex.context;
-    // Stone base
-    ctx.fillStyle = '#888888';
-    ctx.beginPath();
-    ctx.ellipse(w / 2, h * 0.7, 14, 8, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // Water
-    ctx.fillStyle = '#4088c0';
-    ctx.beginPath();
-    ctx.ellipse(w / 2, h * 0.65, 10, 5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // Center pillar
-    ctx.fillStyle = '#999999';
-    ctx.fillRect(w / 2 - 2, h * 0.3, 4, h * 0.4);
-    tex.refresh();
-  }
+      // Shuffle candidates and place peaks
+      for (let i = candidates.length - 1; i > 0; i--) {
+        const j = Math.floor(rand() * (i + 1));
+        [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+      }
 
-  private createFlowerTexture(): void {
-    if (this.textures.exists('feature-flower')) return;
-    const w = 10, h = 10;
-    const tex = this.textures.createCanvas('feature-flower', w, h);
-    if (!tex) return;
-    const ctx = tex.context;
-    const colors = ['#e88cb0', '#f0d060', '#ff9090', '#ffa0d0'];
-    for (let i = 0; i < 4; i++) {
-      ctx.fillStyle = colors[i];
-      ctx.beginPath();
-      ctx.arc(2 + (i % 2) * 6, 2 + Math.floor(i / 2) * 6, 2, 0, Math.PI * 2);
-      ctx.fill();
+      for (const tile of candidates) {
+        if (count >= peaksInCluster) break;
+        placed.add(`${tile.col},${tile.row}`);
+        count++;
+
+        const pos = this.tilemapManager.gridToScreen(tile.col, tile.row);
+        const scale = 0.35 + rand() * 0.30; // 0.35–0.65
+        const offsetY = -18 - rand() * 14;
+
+        const peak = this.add.image(pos.x + (rand() - 0.5) * 10, pos.y + offsetY, 'tile-mountain-peak');
+        peak.setOrigin(0.5, 0.85);
+        peak.setScale(scale);
+        peak.setDepth(5 + (tile.col + tile.row) * 0.01);
+        peak.setAlpha(0.85 + rand() * 0.15);
+        this.trackAsset(tile.col, tile.row, 'tile-mountain-peak');
+      }
     }
-    tex.refresh();
   }
 
   /**
-   * Randomly scatter tent / building structures across every district.
-   * Uses organic tile sets from TilemapManager for placement.
+   * Place lava gradient in DeFi Docks: lava-center on water/stream tiles,
+   * then progressively tile-lava → tile-lava-crust → tile-lava-base outward.
    */
-  private scatterStructures(): void {
-    const rand = seededRng(42);
-    const AMBIENT_PER_DISTRICT = 5;  // reduced — guild halls are the main buildings now
-    const MIN_DIST_SQ = 3.0 * 3.0;   // min distance² between ambient structures
+  private placeDefiLavaGradient(): void {
+    const tiles = this.tilemapManager.getDistrictTiles('defi');
+    if (!tiles || tiles.size === 0) return;
+
+    // Collect all water tiles in DeFi as the lava stream core
+    const waterSet = new Set<string>();
+    const allTiles: { col: number; row: number }[] = [];
+
+    for (const k of tiles) {
+      const [c, r] = k.split(',').map(Number);
+      allTiles.push({ col: c, row: r });
+      if (this.tilemapManager.isWater(c, r)) {
+        waterSet.add(k);
+      }
+    }
+
+    // Calculate minimum distance from each tile to the nearest water tile
+    const distMap = new Map<string, number>();
+    for (const t of allTiles) {
+      const k = `${t.col},${t.row}`;
+      if (waterSet.has(k)) {
+        distMap.set(k, 0);
+        continue;
+      }
+      let minDist = Infinity;
+      for (const wk of waterSet) {
+        const [wc, wr] = wk.split(',').map(Number);
+        const d = Math.abs(t.col - wc) + Math.abs(t.row - wr); // Manhattan distance
+        if (d < minDist) minDist = d;
+      }
+      distMap.set(k, minDist);
+    }
+
+    // Overlay lava tiles based on distance from stream
+    for (const t of allTiles) {
+      const k = `${t.col},${t.row}`;
+      const dist = distMap.get(k) ?? Infinity;
+
+      let texKey: string | null = null;
+      if (dist === 0) texKey = 'tile-lava-center';
+      else if (dist === 1) texKey = 'tile-lava';
+      else if (dist === 2) texKey = 'tile-lava-crust';
+      else if (dist <= 4) texKey = 'tile-lava-base';
+      // dist > 4 keeps the ark-rock base terrain
+
+      if (!texKey) continue;
+
+      const pos = this.tilemapManager.gridToScreen(t.col, t.row);
+      const overlay = this.add.image(pos.x, pos.y, texKey);
+      overlay.setOrigin(0.5, 0.5);
+      overlay.setScale(0.65);
+      overlay.setDepth(0.1); // just above base terrain
+      this.trackAsset(t.col, t.row, texKey);
+    }
+  }
+
+  /** Scatter lamp posts across all districts on non-water, non-road tiles. */
+  private scatterLampPosts(): void {
+    const rand = seededRng(5555);
+    const LAMPS_PER_DISTRICT = 5;
+    const MIN_DIST_SQ = 4 * 4; // min 4 tiles apart
 
     for (const category of BIOME_NAMES) {
-      const tileSet = this.tilemapManager.getDistrictTiles(category);
-      if (!tileSet || tileSet.size === 0) continue;
+      if (category !== 'townsquare') continue; // lamp posts only in Town Square
 
-      const tileArr = Array.from(tileSet).map(k => {
+      const tiles = this.tilemapManager.getDistrictTiles(category);
+      if (!tiles || tiles.size === 0) continue;
+
+      const tileArr = Array.from(tiles).map(k => {
         const [c, r] = k.split(',').map(Number);
         return { col: c, row: r };
       });
 
-      const placed: { gx: number; gy: number }[] = [];
-      let attempts = 0;
+      // Shuffle deterministically
+      for (let i = tileArr.length - 1; i > 0; i--) {
+        const j = Math.floor(rand() * (i + 1));
+        [tileArr[i], tileArr[j]] = [tileArr[j], tileArr[i]];
+      }
 
-      while (placed.length < AMBIENT_PER_DISTRICT && attempts < 60) {
-        attempts++;
+      const placed: { col: number; row: number }[] = [];
 
-        const tile = tileArr[Math.floor(rand() * tileArr.length)];
-        const gx = tile.col + (rand() - 0.5) * 0.6;
-        const gy = tile.row + (rand() - 0.5) * 0.6;
+      for (const tile of tileArr) {
+        if (placed.length >= LAMPS_PER_DISTRICT) break;
+        if (this.tilemapManager.isWater(tile.col, tile.row)) continue;
+        if (this.tilemapManager.isRoad(tile.col, tile.row)) continue;
 
         const tooClose = placed.some(
-          p => (p.gx - gx) ** 2 + (p.gy - gy) ** 2 < MIN_DIST_SQ,
+          p => (p.col - tile.col) ** 2 + (p.row - tile.row) ** 2 < MIN_DIST_SQ,
         );
         if (tooClose) continue;
 
-        placed.push({ gx, gy });
-        this.buildingPositions.push({ gx, gy });
+        placed.push(tile);
 
-        if (this.tilemapManager.isWater(tile.col, tile.row)) continue;
-
-        const pos = this.tilemapManager.gridToScreen(gx, gy);
-        const biomeKeys = BIOME_STRUCTURES[category] ?? Object.values(BIOME_STRUCTURES).flat();
-        const key = biomeKeys[Math.floor(rand() * biomeKeys.length)];
-        const scale = 0.35 + rand() * 0.1;
-
-        // Drop shadow
-        const shadow = this.add.image(pos.x + 4, pos.y + 6, 'building-shadow');
-        shadow.setOrigin(0.5, 0.5);
-        shadow.setScale(scale * 1.8, scale * 1.2);
-        shadow.setDepth(0.5);
-
-        // Ambient building sprite (non-interactive decoration)
-        const sprite = this.add.image(pos.x, pos.y, key);
-        sprite.setOrigin(0.5, 0.85);
-        sprite.setScale(scale);
-        sprite.setDepth(7 + (gx + gy) * 0.01);
-        sprite.setAlpha(0.7); // dimmed to distinguish from guild halls
-        this.buildingSprites.push(sprite);
-
-        // Chimney smoke for eligible buildings
-        this.particleManager.addSmokeIfEligible(key, pos.x, pos.y);
+        const pos = this.tilemapManager.gridToScreen(tile.col, tile.row);
+        const lamp = this.add.image(pos.x + 10, pos.y - 6, 'deco-lamp-post');
+        lamp.setOrigin(0.5, 0.95);
+        lamp.setScale(0.4 + rand() * 0.1);
+        lamp.setDepth(6 + (tile.col + tile.row) * 0.01);
+        this.trackAsset(tile.col, tile.row, 'deco-lamp-post');
       }
+    }
+  }
+
+  /** Place fishing boats at fixed positions on Translation Ward ocean. */
+  private scatterTranslationBoats(): void {
+    const boatPositions = [
+      { col: 48, row: 14 },
+      { col: 48, row: 16 },
+    ];
+    for (const tile of boatPositions) {
+      const pos = this.tilemapManager.gridToScreen(tile.col, tile.row);
+      const boat = this.add.image(pos.x, pos.y, 'deco-fishing-boat');
+      boat.setOrigin(0.5, 0.7);
+      boat.setScale(0.45);
+      boat.setDepth(6 + (tile.col + tile.row) * 0.01);
+      boat.setAlpha(0.90);
+      this.trackAsset(tile.col, tile.row, 'deco-fishing-boat');
+    }
+  }
+
+  /** Place dense crystal clusters on the edges of Research Fields. */
+  private scatterResearchCrystals(): void {
+    const rand = seededRng(6283);
+    const tiles = this.tilemapManager.getDistrictTiles('research');
+    if (!tiles || tiles.size === 0) return;
+
+    const tileSet = new Set(tiles);
+    const bounds = this.tilemapManager.getDistrictBounds('research');
+    if (!bounds) return;
+    const cx = bounds.centerCol;
+    const cy = bounds.centerRow;
+
+    // Collect edge tiles: boundary tiles (within 2 tiles of district boundary)
+    const edgeTiles: { col: number; row: number }[] = [];
+    for (const k of tiles) {
+      const [c, r] = k.split(',').map(Number);
+      if (this.tilemapManager.isWater(c, r)) continue;
+      if (this.tilemapManager.isRoad(c, r)) continue;
+      // Near-edge: at least one tile within 2 steps is outside the district
+      let nearEdge = false;
+      for (let dc = -2; dc <= 2 && !nearEdge; dc++) {
+        for (let dr = -2; dr <= 2 && !nearEdge; dr++) {
+          if (!tileSet.has(`${c + dc},${r + dr}`)) nearEdge = true;
+        }
+      }
+      if (nearEdge) edgeTiles.push({ col: c, row: r });
+    }
+
+    // Sort then shuffle
+    edgeTiles.sort((a, b) => a.col - b.col || a.row - b.row);
+    for (let i = edgeTiles.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [edgeTiles[i], edgeTiles[j]] = [edgeTiles[j], edgeTiles[i]];
+    }
+
+    // Pick 6 group centers along the edges, well-spaced
+    const GROUP_COUNT = 6;
+    const GROUP_MIN_DIST_SQ = 4 * 4;
+    const groupCenters: { col: number; row: number }[] = [];
+
+    for (const tile of edgeTiles) {
+      if (groupCenters.length >= GROUP_COUNT) break;
+
+      let nearRoad = false;
+      for (let dc = -2; dc <= 2 && !nearRoad; dc++) {
+        for (let dr = -2; dr <= 2 && !nearRoad; dr++) {
+          if (this.tilemapManager.isRoad(tile.col + dc, tile.row + dr)) nearRoad = true;
+        }
+      }
+      if (nearRoad) continue;
+
+      const tooClose = groupCenters.some(
+        p => (p.col - tile.col) ** 2 + (p.row - tile.row) ** 2 < GROUP_MIN_DIST_SQ,
+      );
+      if (tooClose) continue;
+      groupCenters.push(tile);
+    }
+
+    // Fill each group with 8–12 crystals within 3-tile radius
+    const placed = new Set<string>();
+    for (const center of groupCenters) {
+      const CLUSTER_RADIUS = 3;
+      const crystalsInCluster = 8 + Math.floor(rand() * 5);
+      let count = 0;
+
+      const candidates: { col: number; row: number }[] = [];
+      for (let dc = -CLUSTER_RADIUS; dc <= CLUSTER_RADIUS; dc++) {
+        for (let dr = -CLUSTER_RADIUS; dr <= CLUSTER_RADIUS; dr++) {
+          const c = center.col + dc;
+          const r = center.row + dr;
+          const k = `${c},${r}`;
+          if (!tileSet.has(k) || placed.has(k)) continue;
+          if (this.tilemapManager.isWater(c, r)) continue;
+          if (this.tilemapManager.isRoad(c, r)) continue;
+          candidates.push({ col: c, row: r });
+        }
+      }
+
+      for (let i = candidates.length - 1; i > 0; i--) {
+        const j = Math.floor(rand() * (i + 1));
+        [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+      }
+
+      for (const tile of candidates) {
+        if (count >= crystalsInCluster) break;
+        placed.add(`${tile.col},${tile.row}`);
+        count++;
+
+        const pos = this.tilemapManager.gridToScreen(tile.col, tile.row);
+        const crystal = this.add.image(pos.x + (rand() - 0.5) * 10, pos.y, 'deco-crystal');
+        crystal.setOrigin(0.5, 0.85);
+        crystal.setScale(0.40 + rand() * 0.20);
+        crystal.setDepth(6.5 + (tile.col + tile.row) * 0.01);
+        crystal.setAlpha(0.75 + rand() * 0.25);
+        this.trackAsset(tile.col, tile.row, 'deco-crystal');
+      }
+    }
+  }
+
+  /** Place dense blossom tree clusters across the Creative Quarter. */
+  private scatterBlossomTrees(): void {
+    const rand = seededRng(3141);
+    const tiles = this.tilemapManager.getDistrictTiles('creative');
+    if (!tiles || tiles.size === 0) return;
+
+    const tileSet = new Set(tiles);
+    const tileArr = Array.from(tiles).map(k => {
+      const [c, r] = k.split(',').map(Number);
+      return { col: c, row: r };
+    });
+
+    // Collect top-edge tiles: boundary tiles in the upper half of the district
+    const creativeBounds = this.tilemapManager.getDistrictBounds('creative');
+    const topEdgeTiles: { col: number; row: number }[] = [];
+    const midRow = creativeBounds ? creativeBounds.centerRow : 28;
+
+    for (const k of tiles) {
+      const [c, r] = k.split(',').map(Number);
+      if (r > midRow) continue; // only top half
+      if (this.tilemapManager.isWater(c, r)) continue;
+      if (this.tilemapManager.isRoad(c, r)) continue;
+      // Edge: at least one cardinal neighbor is outside the district
+      const isEdge =
+        !tileSet.has(`${c - 1},${r}`) || !tileSet.has(`${c + 1},${r}`) ||
+        !tileSet.has(`${c},${r - 1}`) || !tileSet.has(`${c},${r + 1}`);
+      if (isEdge) topEdgeTiles.push({ col: c, row: r });
+    }
+
+    // Sort then shuffle
+    topEdgeTiles.sort((a, b) => a.col - b.col || a.row - b.row);
+    for (let i = topEdgeTiles.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [topEdgeTiles[i], topEdgeTiles[j]] = [topEdgeTiles[j], topEdgeTiles[i]];
+    }
+
+    // Pick 5 group centers along the top edge
+    const GROUP_COUNT = 5;
+    const GROUP_MIN_DIST_SQ = 3 * 3;
+    const groupCenters: { col: number; row: number }[] = [];
+
+    for (const tile of topEdgeTiles) {
+      if (groupCenters.length >= GROUP_COUNT) break;
+
+      let nearRoad = false;
+      for (let dc = -2; dc <= 2 && !nearRoad; dc++) {
+        for (let dr = -2; dr <= 2 && !nearRoad; dr++) {
+          if (this.tilemapManager.isRoad(tile.col + dc, tile.row + dr)) nearRoad = true;
+        }
+      }
+      if (nearRoad) continue;
+
+      const tooClose = groupCenters.some(
+        p => (p.col - tile.col) ** 2 + (p.row - tile.row) ** 2 < GROUP_MIN_DIST_SQ,
+      );
+      if (tooClose) continue;
+      groupCenters.push(tile);
+    }
+
+    // Fill each group with 6–10 blossom trees within 3-tile radius
+    const placed = new Set<string>();
+    for (const center of groupCenters) {
+      const CLUSTER_RADIUS = 3;
+      const treesInCluster = 6 + Math.floor(rand() * 5);
+      let count = 0;
+
+      const candidates: { col: number; row: number }[] = [];
+      for (let dc = -CLUSTER_RADIUS; dc <= CLUSTER_RADIUS; dc++) {
+        for (let dr = -CLUSTER_RADIUS; dr <= CLUSTER_RADIUS; dr++) {
+          const c = center.col + dc;
+          const r = center.row + dr;
+          const k = `${c},${r}`;
+          if (!tileSet.has(k) || placed.has(k)) continue;
+          if (this.tilemapManager.isWater(c, r)) continue;
+          if (this.tilemapManager.isRoad(c, r)) continue;
+          candidates.push({ col: c, row: r });
+        }
+      }
+
+      for (let i = candidates.length - 1; i > 0; i--) {
+        const j = Math.floor(rand() * (i + 1));
+        [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+      }
+
+      for (const tile of candidates) {
+        if (count >= treesInCluster) break;
+        placed.add(`${tile.col},${tile.row}`);
+        count++;
+
+        const pos = this.tilemapManager.gridToScreen(tile.col, tile.row);
+        const jitterX = (rand() - 0.5) * 16;
+        const jitterY = (rand() - 0.5) * 8;
+        const tree = this.add.image(pos.x + jitterX, pos.y + jitterY, 'deco-blossom-tree');
+        tree.setOrigin(0.5, 0.85);
+        tree.setScale(0.30 + rand() * 0.20);
+        tree.setDepth(6.5 + (tile.col + tile.row) * 0.01);
+        tree.setAlpha(0.80 + rand() * 0.20);
+        this.trackAsset(tile.col, tile.row, 'deco-blossom-tree');
+      }
+    }
+
+    // 4 circular flower patches in the Creative Quarter
+    const bounds = this.tilemapManager.getDistrictBounds('creative');
+    if (!bounds) return;
+    const cx = bounds.centerCol;
+    const cy = bounds.centerRow;
+
+    // Pick 4 flower patch centers spread around the district center
+    const flowerCenters = [
+      { col: cx - 4, row: cy - 3 },
+      { col: cx + 4, row: cy - 3 },
+      { col: cx - 4, row: cy + 3 },
+      { col: cx + 4, row: cy + 3 },
+    ];
+
+    // 3x3 diamond pattern offsets (9 tiles): center + 4 cardinal + 4 diagonal
+    const diamondOffsets = [
+      { dc: 0, dr: 0 },
+      { dc: -1, dr: 0 }, { dc: 1, dr: 0 }, { dc: 0, dr: -1 }, { dc: 0, dr: 1 },
+      { dc: -1, dr: -1 }, { dc: 1, dr: -1 }, { dc: -1, dr: 1 }, { dc: 1, dr: 1 },
+    ];
+
+    for (const fc of flowerCenters) {
+      for (const off of diamondOffsets) {
+          const c = Math.round(fc.col) + off.dc;
+          const r = Math.round(fc.row) + off.dr;
+          const k = `${c},${r}`;
+          if (!tileSet.has(k)) continue;
+          if (this.tilemapManager.isWater(c, r)) continue;
+          if (this.tilemapManager.isRoad(c, r)) continue;
+
+          const pos = this.tilemapManager.gridToScreen(c, r);
+          const flower = this.add.image(pos.x, pos.y, 'tile-meadow-flowers');
+          flower.setOrigin(0.5, 0.5);
+          flower.setScale(0.85 + rand() * 0.15);
+          flower.setDepth(0.5 + (c + r) * 0.001);
+          flower.setAlpha(0.85 + rand() * 0.15);
+          this.trackAsset(c, r, 'tile-meadow-flowers');
+      }
+    }
+
+    // Cover all water tiles in Creative Quarter with pond sprites
+    const pondKeys = ['deco-pond-center', 'deco-pond-left', 'deco-pond-right'];
+    for (const k of tiles) {
+      const [c, r] = k.split(',').map(Number);
+      if (!this.tilemapManager.isWater(c, r)) continue;
+
+      const pos = this.tilemapManager.gridToScreen(c, r);
+      const key = pondKeys[(c + r) % pondKeys.length];
+      const pond = this.add.image(pos.x, pos.y, key);
+      pond.setOrigin(0.5, 0.5);
+      pond.setScale(0.65);
+      pond.setDepth(0.5 + (c + r) * 0.001);
+      this.trackAsset(c, r, key);
     }
   }
 
@@ -864,5 +947,7 @@ export class WorldScene extends Phaser.Scene {
     this.particleManager?.destroy();
     this.minimapManager?.destroy();
     this.treeManager?.destroy();
+    this.debugEl?.remove();
+    this.debugEl = null;
   }
 }

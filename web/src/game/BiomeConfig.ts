@@ -80,7 +80,7 @@ export function shouldBeWater(
       return nx * nx + ny * ny < 0.06;
     case 'defi':
       // Diagonal lava river through the district
-      return Math.abs(nx - ny) < 0.12;
+      return Math.abs(nx - ny) < 0.05;
     case 'research':
       // Scattered mystic pools using trig for pseudo-random placement
       return Math.sin(col * 3.7) * Math.cos(row * 2.3) > 0.85;

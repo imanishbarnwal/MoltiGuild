@@ -1,6 +1,11 @@
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     // Phaser requires some specific handling
     config.module.rules.push({
       test: /\.m?js$/,
@@ -10,13 +15,15 @@ const nextConfig = {
     });
 
     // Stub out optional dependencies from wagmi/RainbowKit connectors
-    // These are only needed for React Native or server-side logging
     config.resolve.fallback = {
       ...config.resolve.fallback,
       'pino-pretty': false,
     };
+
+    // Phaser 3.80 has a truncated phaser.js dist — use the ESM build instead
     config.resolve.alias = {
       ...config.resolve.alias,
+      phaser: path.resolve(__dirname, 'node_modules/phaser/dist/phaser.esm.js'),
       '@react-native-async-storage/async-storage': false,
     };
 
