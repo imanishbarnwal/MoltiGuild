@@ -1401,6 +1401,8 @@ app.get('/api/events', (req, res) => {
         'Cache-Control': 'no-cache',
         Connection: 'keep-alive',
         'Access-Control-Allow-Origin': '*',
+        'Alt-Svc': 'clear',          // Prevent QUIC — SSE needs stable HTTP/1.1 or h2
+        'X-Accel-Buffering': 'no',   // Disable proxy buffering (Nginx/Render)
     });
 
     // Send initial connection event
@@ -1409,10 +1411,10 @@ app.get('/api/events', (req, res) => {
     sseClients.add(res);
     console.log(`SSE client connected (${sseClients.size} total)`);
 
-    // Keepalive every 30s
+    // Keepalive every 15s — prevents QUIC_TOO_MANY_RTOS on HTTP/3 connections
     const keepalive = setInterval(() => {
         res.write(': keepalive\n\n');
-    }, 30000);
+    }, 15000);
 
     req.on('close', () => {
         clearInterval(keepalive);
