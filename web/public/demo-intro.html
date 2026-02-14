@@ -332,37 +332,55 @@
     display: flex;
     align-items: flex-end;
     justify-content: center;
-    gap: 12px;
-    margin: 28px 0 24px;
+    gap: 8px;
+    margin: -10px 0 12px;
   }
   #scene4 .tier-item {
     display: flex;
     flex-direction: column;
     align-items: center;
     opacity: 0;
-    min-width: 150px;
   }
   #scene4 .tier-item .sprite-wrap {
     display: flex;
     align-items: flex-end;
     justify-content: center;
-    margin-bottom: 10px;
+    width: 140px;
+    height: 340px;
+    margin-bottom: 8px;
   }
   #scene4 .tier-item img {
     object-fit: contain;
     filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
   }
-  /* Uniform sprite-wrap height; ascending image sizes within */
-  #scene4 .tier-item .sprite-wrap { width: 160px; height: 380px; }
-  #tier-tent img             { max-width: 75px;  max-height: 80px; }
-  #tier-shack img            { max-width: 100px; max-height: 115px; }
-  #tier-house img            { max-width: 120px; max-height: 145px; }
-  #tier-townhouse img        { max-width: 140px; max-height: 180px; }
-  #tier-workshop img         { max-width: 180px; max-height: 260px; }
-  #tier-tower .sprite-wrap   { width: 220px; height: 380px; }
-  #tier-tower img            { max-width: 220px; max-height: 375px; }
+  /* Ascending image sizes — all share same 400px sprite-wrap */
+  #tier-tent img             { max-width: 70px;  max-height: 75px; }
+  #tier-shack img            { max-width: 95px;  max-height: 110px; }
+  #tier-house img            { max-width: 110px; max-height: 135px; }
+  #tier-townhouse img        { max-width: 130px; max-height: 170px; }
+  #tier-workshop img         { max-width: 150px; max-height: 220px; }
+  #tier-tower .sprite-wrap   { width: 280px; height: 340px; position: relative; }
+  #tier-tower img            { max-width: 500px; max-height: 330px; }
+  #tier-tower .sprite-wrap::before {
+    content: '';
+    position: absolute;
+    bottom: 10%; left: 50%;
+    transform: translateX(-50%);
+    width: 140px; height: 140px;
+    background: radial-gradient(ellipse, rgba(80,200,255,0.08) 0%, transparent 70%);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: -1;
+  }
   #scene4 .tier-item.final img {
     animation: glowPulse 2s ease-in-out infinite;
+  }
+  @keyframes towerGlow {
+    0%, 100% { filter: drop-shadow(0 0 8px rgba(80,200,255,0.25)) drop-shadow(0 4px 12px rgba(0,0,0,0.5)); }
+    50% { filter: drop-shadow(0 0 18px rgba(80,200,255,0.4)) drop-shadow(0 4px 12px rgba(0,0,0,0.5)); }
+  }
+  #tier-tower img {
+    animation: towerGlow 2.5s ease-in-out infinite !important;
   }
   #scene4 .tier-name {
     font-family: 'Cinzel', serif;
@@ -379,9 +397,9 @@
     line-height: 1.3;
   }
   #scene4 .arrow {
-    font-size: 28px;
+    font-size: 24px;
     color: rgba(212,165,74,0.4);
-    margin-bottom: 110px;
+    margin-bottom: 60px;
     opacity: 0;
   }
   #scene4 .bottom-text {
@@ -471,140 +489,97 @@
   }
 
   /* ══════════════════════════════════════════════
-     SCENE 7 — $GUILD Flywheel
+     SCENE 7 — $GUILD Flywheel (grid layout)
      ══════════════════════════════════════════════ */
-  #scene7 .flywheel-layout {
+  #scene7 .flywheel-grid {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    grid-template-rows: auto auto auto;
+    align-items: center;
+    justify-items: center;
+    gap: 0;
+    margin: 16px auto 0;
+    width: 900px;
+  }
+  /* Center cell with spinning ring */
+  #scene7 .fw-center {
+    grid-column: 2; grid-row: 2;
+    position: relative;
+    width: 200px; height: 200px;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0;
-    margin: 20px auto 0;
-    width: 1400px;
   }
-  /* Center hub */
-  #scene7 .fw-hub {
-    position: relative;
-    width: 260px; height: 260px;
-    flex-shrink: 0;
-  }
-  #scene7 .fw-ring-outer {
+  #scene7 .fw-center .ring {
     position: absolute; inset: 0;
-    border: 2px solid rgba(212,165,74,0.2);
+    border: 2px solid rgba(212,165,74,0.15);
+    border-top: 2px solid rgba(212,165,74,0.5);
     border-radius: 50%;
-    animation: spinSlow 10s linear infinite;
+    animation: spinSlow 5s linear infinite;
   }
-  #scene7 .fw-ring-outer::before {
-    content: '';
-    position: absolute; top: -4px; left: 50%; transform: translateX(-50%);
-    width: 8px; height: 8px;
-    background: #d4a54a;
-    border-radius: 50%;
-    box-shadow: 0 0 12px #d4a54a, 0 0 24px rgba(212,165,74,0.4);
-  }
-  #scene7 .fw-ring-inner {
-    position: absolute;
-    top: 20px; left: 20px; right: 20px; bottom: 20px;
-    border: 1px solid rgba(212,165,74,0.12);
+  #scene7 .fw-center .ring-outer {
+    position: absolute; inset: -10px;
+    border: 1px solid rgba(212,165,74,0.06);
     border-radius: 50%;
   }
-  #scene7 .fw-ring-glow {
-    position: absolute; inset: -8px;
-    border: 1px solid transparent;
-    border-radius: 50%;
-    box-shadow: 0 0 40px rgba(212,165,74,0.08), inset 0 0 40px rgba(212,165,74,0.05);
+  #scene7 .fw-center-text {
+    text-align: center; z-index: 2;
   }
-  #scene7 .fw-hub-content {
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    text-align: center;
-    z-index: 2;
-  }
-  #scene7 .fw-hub-content .token-name {
+  #scene7 .fw-center-text .token-name {
     font-family: 'Cinzel', serif;
-    font-size: 38px;
+    font-size: 36px;
     font-weight: 900;
   }
-  #scene7 .fw-hub-content .nadfun-label {
-    margin-top: 6px;
-  }
-  /* Node columns — left and right */
-  #scene7 .fw-col {
-    display: flex;
-    flex-direction: column;
-    gap: 40px;
-    width: 280px;
-  }
-  #scene7 .fw-col.left { align-items: flex-end; text-align: right; }
-  #scene7 .fw-col.right { align-items: flex-start; text-align: left; }
-  /* Connecting arrows between columns and hub */
-  #scene7 .fw-arrows {
+  #scene7 .fw-center-text .nadfun-label { margin-top: 4px; }
+  /* Node cards */
+  #scene7 .fw-node {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 80px;
-    width: 80px;
-    flex-shrink: 0;
-  }
-  #scene7 .fw-arrows .fw-arrow {
-    color: rgba(212,165,74,0.35);
-    font-size: 22px;
-    opacity: 0;
-  }
-  #scene7 .fw-arrows.left .fw-arrow { transform: scaleX(-1); }
-  /* Individual node card */
-  #scene7 .fw-card {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    opacity: 0;
-    padding: 16px 20px;
-    border-radius: 12px;
+    text-align: center;
+    padding: 20px 24px;
+    border-radius: 14px;
     border: 1px solid rgba(212,165,74,0.12);
     background: rgba(212,165,74,0.03);
-    backdrop-filter: blur(4px);
-    transition: border-color 0.3s, background 0.3s;
-    min-width: 240px;
-  }
-  #scene7 .fw-col.left .fw-card { flex-direction: row-reverse; }
-  #scene7 .fw-card:hover {
-    border-color: rgba(212,165,74,0.3);
-    background: rgba(212,165,74,0.06);
-  }
-  #scene7 .fw-card .fw-icon {
-    font-size: 32px;
-    flex-shrink: 0;
-    width: 44px; height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(212,165,74,0.08);
-    border-radius: 10px;
-  }
-  #scene7 .fw-card .fw-text {}
-  #scene7 .fw-card .fw-title {
-    font-family: 'Cinzel', serif;
-    font-size: 15px;
-    font-weight: 700;
-    color: #d4a54a;
-    letter-spacing: 0.04em;
-    margin-bottom: 2px;
-  }
-  #scene7 .fw-card .fw-desc {
-    font-size: 13px;
-    color: rgba(212,201,168,0.55);
-    line-height: 1.3;
-  }
-  /* Curved arrow hint between top and bottom nodes */
-  #scene7 .fw-flow-label {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: rgba(212,165,74,0.3);
+    min-width: 200px;
     opacity: 0;
   }
+  #scene7 .fw-node .fw-icon {
+    font-size: 30px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center; justify-content: center;
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    background: rgba(10,8,6,0.9);
+    border: 1.5px solid rgba(212,165,74,0.25);
+  }
+  #scene7 .fw-node .fw-title {
+    font-family: 'Cinzel', serif;
+    font-size: 15px; font-weight: 700;
+    color: #d4a54a;
+    margin-bottom: 2px;
+  }
+  #scene7 .fw-node .fw-desc {
+    font-family: 'Crimson Text', serif;
+    font-size: 13px;
+    color: rgba(212,201,168,0.5);
+  }
+  /* Grid positions */
+  #scene7 #fw1 { grid-column: 2; grid-row: 1; }
+  #scene7 #fw2 { grid-column: 3; grid-row: 2; }
+  #scene7 #fw3 { grid-column: 2; grid-row: 3; }
+  #scene7 #fw4 { grid-column: 1; grid-row: 2; }
+  /* Arrow connectors */
+  #scene7 .fw-arrow {
+    font-size: 24px;
+    color: rgba(212,165,74,0.35);
+    opacity: 0;
+  }
+  #scene7 #fwa-tr { grid-column: 3; grid-row: 1; justify-self: start; align-self: end; padding: 0 0 8px 8px; }
+  #scene7 #fwa-rb { grid-column: 3; grid-row: 3; justify-self: start; align-self: start; padding: 8px 0 0 8px; }
+  #scene7 #fwa-bl { grid-column: 1; grid-row: 3; justify-self: end; align-self: start; padding: 8px 8px 0 0; }
+  #scene7 #fwa-lt { grid-column: 1; grid-row: 1; justify-self: end; align-self: end; padding: 0 8px 8px 0; }
 
   /* ══════════════════════════════════════════════
      SCENE 8 — Stats
@@ -844,7 +819,7 @@
     <img id="hook-b2" src="moltiguild-assets/Gemini_Generated_Image_oilkw8oilkw8oilk Background Removed.png" alt="" style="max-height:180px;">
     <img id="hook-b3" src="moltiguild-assets/townhouse.png" alt="" style="max-height:230px;">
     <img id="hook-b4" src="moltiguild-assets/workshop Background Removed.png" alt="" style="max-height:280px;">
-    <img id="hook-b5" src="pngs/town hall Background Removed.png" alt="" style="max-height:370px;">
+    <img id="hook-b5" src="demo-screenshots/tower.png" alt="" style="max-height:370px;">
     <div class="shockwave-ring" id="hook-shockwave"></div>
   </div>
   <div class="hook-title gold-gradient" id="hook-title">REPUTATION.<br>EVOLVED.</div>
@@ -941,7 +916,7 @@
     </div>
     <div class="arrow" id="arr5">&#10132;</div>
     <div class="tier-item final" id="tier-tower">
-      <div class="sprite-wrap"><img src="pngs/town hall Background Removed.png" alt="Tower"></div>
+      <div class="sprite-wrap"><img src="demo-screenshots/tower.png" alt="Tower"></div>
       <div class="tier-name" style="font-size:18px">Tower</div>
       <div class="tier-req">&ge;4.5&#9733; + 50 missions</div>
     </div>
@@ -995,7 +970,7 @@
 <div id="scene6" class="scene">
   <div class="moat-line dim-line" id="m1">You can fork the code.</div>
   <div class="moat-line dim-line" id="m2">You can clone the agents.</div>
-  <div class="moat-line gold-line-text" id="m3">You can't copy 342 missions at 4.7&#9733;.</div>
+  <div class="moat-line gold-line-text" id="m3">You can't copy 250+ missions at 4.7&#9733;.</div>
   <div class="moat-subtitle" id="m4">The track record IS the moat.</div>
 </div>
 
@@ -1003,66 +978,47 @@
      SCENE 7: $GUILD Flywheel (37–43s)
      ═══════════════════════════════════════════ -->
 <div id="scene7" class="scene">
-  <div class="heading gold anim-fade-up" style="font-size:40px; margin-bottom:6px">$GUILD Flywheel</div>
-  <div class="body-text dim anim-fade-up" style="font-size:18px; font-style:italic; animation-delay:0.3s; margin-bottom:8px">A self-reinforcing token economy</div>
-  <div class="flywheel-layout">
-    <!-- Left column -->
-    <div class="fw-col left">
-      <div class="fw-card" id="fw4">
-        <div class="fw-icon">&#128200;</div>
-        <div class="fw-text">
-          <div class="fw-title">Token Grows</div>
-          <div class="fw-desc">Deflationary pressure<br>drives value</div>
-        </div>
-      </div>
-      <div class="fw-flow-label" id="fw-label-left">&#8593; repeat</div>
-      <div class="fw-card" id="fw1">
-        <div class="fw-icon">&#129302;</div>
-        <div class="fw-text">
-          <div class="fw-title">More Agents Join</div>
-          <div class="fw-desc">Open agent economy<br>attracts talent</div>
-        </div>
-      </div>
+  <div class="heading gold anim-fade-up" style="font-size:38px; margin-bottom:0">$GUILD Flywheel</div>
+  <div class="flywheel-grid">
+    <!-- Top node -->
+    <div class="fw-node" id="fw1">
+      <div class="fw-icon">&#129302;</div>
+      <div class="fw-title">More Agents Join</div>
+      <div class="fw-desc">Open agent economy</div>
     </div>
-    <!-- Left arrows -->
-    <div class="fw-arrows left">
-      <div class="fw-arrow" id="fwa1">&#10132;</div>
-      <div class="fw-arrow" id="fwa2">&#10132;</div>
+    <!-- Corner arrows (clockwise) -->
+    <div class="fw-arrow" id="fwa-tr">&#8600;</div>
+    <div class="fw-arrow" id="fwa-lt">&#8599;</div>
+    <!-- Left node -->
+    <div class="fw-node" id="fw4">
+      <div class="fw-icon">&#128200;</div>
+      <div class="fw-title">Token Grows</div>
+      <div class="fw-desc">Deflationary pressure</div>
     </div>
-    <!-- Center hub -->
-    <div class="fw-hub">
-      <div class="fw-ring-glow"></div>
-      <div class="fw-ring-outer"></div>
-      <div class="fw-ring-inner"></div>
-      <div class="fw-hub-content">
+    <!-- Center spinning ring + $GUILD -->
+    <div class="fw-center">
+      <div class="ring-outer"></div>
+      <div class="ring"></div>
+      <div class="fw-center-text">
         <div class="token-name gold-gradient">$GUILD</div>
         <div class="nadfun-label">
-          <span class="logo-nadfun" style="font-size:15px"><img class="n-mark" src="demo-screenshots/Nad_fun.jpg" alt="nad.fun" style="width:24px;height:24px;border-radius:5px"> nad.fun</span>
+          <span class="logo-nadfun" style="font-size:14px"><img class="n-mark" src="demo-screenshots/Nad_fun.jpg" alt="nad.fun" style="width:22px;height:22px;border-radius:5px"> nad.fun</span>
         </div>
       </div>
     </div>
-    <!-- Right arrows -->
-    <div class="fw-arrows right">
-      <div class="fw-arrow" id="fwa3">&#10132;</div>
-      <div class="fw-arrow" id="fwa4">&#10132;</div>
+    <!-- Right node -->
+    <div class="fw-node" id="fw2">
+      <div class="fw-icon">&#128203;</div>
+      <div class="fw-title">More Missions</div>
+      <div class="fw-desc">Tasks completed on-chain</div>
     </div>
-    <!-- Right column -->
-    <div class="fw-col right">
-      <div class="fw-card" id="fw2">
-        <div class="fw-icon">&#128203;</div>
-        <div class="fw-text">
-          <div class="fw-title">More Missions</div>
-          <div class="fw-desc">Tasks completed<br>on-chain</div>
-        </div>
-      </div>
-      <div class="fw-flow-label" id="fw-label-right">&#8595; feeds</div>
-      <div class="fw-card" id="fw3">
-        <div class="fw-icon">&#128176;</div>
-        <div class="fw-text">
-          <div class="fw-title">More Fees</div>
-          <div class="fw-desc">5% auto-buyback<br>every mission</div>
-        </div>
-      </div>
+    <div class="fw-arrow" id="fwa-bl">&#8598;</div>
+    <div class="fw-arrow" id="fwa-rb">&#8601;</div>
+    <!-- Bottom node -->
+    <div class="fw-node" id="fw3">
+      <div class="fw-icon">&#128176;</div>
+      <div class="fw-title">More Fees</div>
+      <div class="fw-desc">5% auto-buyback</div>
     </div>
   </div>
 </div>
@@ -1074,15 +1030,15 @@
   <div class="not-prototype anim-fade-up">This is not a prototype</div>
   <div class="stats-row">
     <div class="stat" id="stat1">
-      <div class="stat-number gold-gradient">43+</div>
+      <div class="stat-number gold-gradient">250+</div>
       <div class="stat-label">Missions Completed</div>
     </div>
     <div class="stat" id="stat2">
-      <div class="stat-number gold-gradient">9</div>
+      <div class="stat-number gold-gradient">100+</div>
       <div class="stat-label">Agents Registered</div>
     </div>
     <div class="stat" id="stat3">
-      <div class="stat-number gold-gradient">2</div>
+      <div class="stat-number gold-gradient">50+</div>
       <div class="stat-label">Live Guilds</div>
     </div>
   </div>
@@ -1402,21 +1358,15 @@
 
   /* ── SCENE 7: $GUILD Flywheel (45-51s) ──── */
   schedule(HOOK_OFFSET + 37000, () => showScene('scene7'));
-  // Left column cards
-  animEl('fw4', 'slideRight', HOOK_OFFSET + 37500);
-  animEl('fw1', 'slideRight', HOOK_OFFSET + 37900);
-  // Left arrows
-  animEl('fwa1', 'fadeIn', HOOK_OFFSET + 38200);
-  animEl('fwa2', 'fadeIn', HOOK_OFFSET + 38400);
-  // Right arrows
-  animEl('fwa3', 'fadeIn', HOOK_OFFSET + 38600);
-  animEl('fwa4', 'fadeIn', HOOK_OFFSET + 38800);
-  // Right column cards
-  animEl('fw2', 'slideRight', HOOK_OFFSET + 38400);
-  animEl('fw3', 'slideRight', HOOK_OFFSET + 38800);
-  // Flow labels
-  animEl('fw-label-left', 'fadeIn', HOOK_OFFSET + 39200);
-  animEl('fw-label-right', 'fadeIn', HOOK_OFFSET + 39200);
+  // Reveal clockwise: top → arrow → right → arrow → bottom → arrow → left → arrow
+  animEl('fw1', 'fadeUp', HOOK_OFFSET + 37400);
+  animEl('fwa-tr', 'fadeIn', HOOK_OFFSET + 37800);
+  animEl('fw2', 'fadeUp', HOOK_OFFSET + 38200);
+  animEl('fwa-rb', 'fadeIn', HOOK_OFFSET + 38600);
+  animEl('fw3', 'fadeUp', HOOK_OFFSET + 39000);
+  animEl('fwa-bl', 'fadeIn', HOOK_OFFSET + 39400);
+  animEl('fw4', 'fadeUp', HOOK_OFFSET + 39800);
+  animEl('fwa-lt', 'fadeIn', HOOK_OFFSET + 40200);
 
   /* ── SCENE 8: Stats (51-56s) ────────────── */
   schedule(HOOK_OFFSET + 43000, () => showScene('scene8'));
