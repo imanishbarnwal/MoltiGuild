@@ -1,9 +1,15 @@
 'use client';
 
-import type { MockPlot } from '@/lib/mock-data';
+interface PlotInfo {
+  plotId: number;
+  district: string;
+  positionTier: string;
+  price: number;
+  status: 'available' | 'claimed';
+}
 
 interface PlotDeedProps {
-  plot: MockPlot;
+  plot: PlotInfo;
   onClose: () => void;
   onClaim: () => void;
 }

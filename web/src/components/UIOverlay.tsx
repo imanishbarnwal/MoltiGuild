@@ -8,7 +8,6 @@ import GuildCard from '@/components/ui/GuildCard';
 import PlotDeed from '@/components/ui/PlotDeed';
 import GuildCreateModal from '@/components/ui/GuildCreateModal';
 import AgentRegisterModal from '@/components/ui/AgentRegisterModal';
-import { MOCK_PLOTS } from '@/lib/mock-data';
 import { useGuildVisuals } from '@/lib/hooks';
 
 type ActiveModal = 'none' | 'guild-create' | 'agent-register';
@@ -87,7 +86,7 @@ export default function UIOverlay() {
     : null;
 
   const selectedPlot = activePlot != null
-    ? MOCK_PLOTS.find(p => p.plotId === activePlot) ?? MOCK_PLOTS[0]
+    ? { plotId: activePlot, district: 'Unknown', positionTier: 'mid-ring' as const, price: 0, status: 'available' as const }
     : null;
 
   return (

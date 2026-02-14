@@ -1,7 +1,7 @@
 'use client';
 
 import { useStats, useCredits, useSSEFeed, useOnlineAgents } from '@/lib/hooks';
-import { timeAgo } from '@/lib/mock-data';
+import { timeAgo } from '@/lib/utils';
 
 interface StatsSidebarProps {
   open: boolean;

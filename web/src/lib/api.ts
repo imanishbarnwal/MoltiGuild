@@ -128,6 +128,10 @@ export const fetchOpenMissions = (guildId?: number) =>
     `/api/missions/open${guildId != null ? `?guildId=${guildId}` : ''}`,
   );
 
+/** Fetch recent missions across all guilds for the activity feed. */
+export const fetchRecentMissions = () =>
+  apiFetch<{ count: number; missions: MissionData[] }>('/api/missions/open');
+
 export const fetchMissionsByGuild = (guildId: number) =>
   apiFetch<{ count: number; missions: MissionData[] }>(
     `/api/guilds/${guildId}/missions`,

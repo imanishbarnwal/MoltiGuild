@@ -8,9 +8,6 @@ import { getUserId } from './user';
 import { subscribeSSE, sseToFeedEvent, type SSEEvent } from './sse';
 import type { FeedEvent, GuildVisual } from './world-state';
 import { getGuildTier, getGuildPosition } from './world-state';
-import {
-  MOCK_GUILDS, MOCK_WALLET,
-} from './mock-data';
 
 /* ── User Identity ──────────────────────────────────────────────── */
 
@@ -33,7 +30,7 @@ export function useCredits() {
     queryFn: () => api.fetchCredits(userId),
     enabled: !!userId,
     refetchInterval: 30_000,
-    placeholderData: { userId: '', credits: `${MOCK_WALLET.balance} MON`, raw: parseFloat(MOCK_WALLET.balance) },
+    placeholderData: { userId: '', credits: '0 MON', raw: 0 },
   });
 }
 
@@ -64,21 +61,13 @@ export function useGuilds() {
       return guilds;
     },
     refetchInterval: 30_000,
-    placeholderData: MOCK_GUILDS.map(g => ({
-      guildId: String(g.guildId),
-      name: g.name,
-      category: g.category,
-      avgRating: g.avgRating,
-      totalMissions: g.totalMissions,
-      memberCount: g.agents.length,
-    })),
   });
 }
 
 /** Enrich raw GuildData into GuildVisual[] for Phaser and UI components. */
 export function useGuildVisuals(): GuildVisual[] {
   const { data: guilds } = useGuilds();
-  if (!guilds) return MOCK_GUILDS;
+  if (!guilds || guilds.length === 0) return [];
 
   return guilds.map((g) => {
     const guildId = Number(g.guildId);
@@ -158,6 +147,25 @@ export function useSSEFeed(maxItems = 20) {
   const [feed, setFeed] = useState<FeedEvent[]>([]);
   const queryClient = useQueryClient();
 
+  // Seed feed with recent missions from the API on mount
+  useEffect(() => {
+    api.fetchRecentMissions()
+      .then(({ missions }) => {
+        const events: FeedEvent[] = missions
+          .slice(0, maxItems)
+          .map(m => ({
+            type: 'mission_created' as const,
+            guildId: Number(m.guildId),
+            missionId: Number(m.missionId),
+            timestamp: m.timestamp_ ? Number(m.timestamp_) * 1000 : Date.now(),
+            txHash: m.transactionHash_ || '',
+          }));
+        if (events.length > 0) setFeed(events);
+      })
+      .catch(() => { /* API unavailable — feed stays empty until SSE events arrive */ });
+  }, [maxItems]);
+
+  // SSE for live updates
   useEffect(() => {
     const unsubscribe = subscribeSSE((sse: SSEEvent) => {
       const feedEvent = sseToFeedEvent(sse);

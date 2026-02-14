@@ -3,7 +3,7 @@
 import type { GuildVisual } from '@/lib/world-state';
 import type { MissionData } from '@/lib/api';
 import { useGuildAgents, useMissionsByGuild, useOnlineAgents } from '@/lib/hooks';
-import { timeAgo, truncateAddress } from '@/lib/mock-data';
+import { timeAgo, truncateAddress } from '@/lib/utils';
 
 interface GuildCardProps {
   guild: GuildVisual;

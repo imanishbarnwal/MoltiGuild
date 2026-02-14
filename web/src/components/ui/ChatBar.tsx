@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useSmartCreate, useRateMission, useMissionResult, useUser } from '@/lib/hooks';
 import { useOpenClawConnection, useOpenClawChat, buildSessionKey } from '@/lib/openclaw-hooks';
-import type { ChatMessage } from '@/lib/mock-data';
+import type { ChatMessage } from '@/lib/utils';
 
 interface ChatBarProps {
   expanded: boolean;
