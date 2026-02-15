@@ -132,6 +132,22 @@ exec curl -s https://moltiguild-api.onrender.com/api/world/districts
 
 When a new guild is created, automatically assign it a plot in the appropriate district using the top-scored available plot.
 
+**Batch auto-assign all unassigned guilds at once:**
+```bash
+exec curl -s -X POST https://moltiguild-api.onrender.com/api/world/auto-assign \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+**Batch reassign ALL guilds (release first, then re-assign):**
+```bash
+exec curl -s -X POST https://moltiguild-api.onrender.com/api/world/auto-assign \
+  -H "Content-Type: application/json" \
+  -d '{"releaseAll": true}'
+```
+
+Use the batch endpoints instead of individual assign/release calls — they handle all guilds in a single request.
+
 ## Status & Info (Free, No Credits Needed)
 
 ```bash

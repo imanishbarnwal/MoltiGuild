@@ -1388,6 +1388,76 @@ app.get('/api/world/districts/:id/suggested-plots', (req, res) => {
     }
 });
 
+// POST /api/world/auto-assign - Batch assign plots to all unassigned guilds
+app.post('/api/world/auto-assign', async (req, res) => {
+    try {
+        const CAT_TO_DISTRICT = {
+            meme: 'creative', 'content-creation': 'creative', writing: 'creative',
+            art: 'creative', design: 'creative',
+            math: 'research', science: 'research', analytics: 'research',
+            trading: 'defi', finance: 'defi',
+            dev: 'code', engineering: 'code',
+            language: 'translation',
+            test: 'townsquare', general: 'townsquare',
+        };
+        function mapDistrict(cat) { return CAT_TO_DISTRICT[cat] || cat; }
+        function tierForGuild(g) {
+            const m = g.totalMissions || 0, r = parseFloat(g.avgRating) || 0;
+            if (m >= 200 && r >= 4.5) return 'diamond';
+            if (m >= 50 && r >= 4.0) return 'gold';
+            if (m >= 10 && r >= 3.5) return 'silver';
+            return 'bronze';
+        }
+
+        const releaseFirst = req.body?.releaseAll === true;
+        const guilds = await monad.fetchGuilds();
+        const allAssignments = worldState.getAllAssignments();
+
+        // Release all if requested
+        let released = 0;
+        if (releaseFirst) {
+            for (const [plotId, assignment] of allAssignments) {
+                worldState.releasePlot(plotId, assignment.guildId);
+                released++;
+            }
+        }
+
+        // Find unassigned guilds
+        const assignedGuilds = new Set();
+        for (const a of worldState.getAllAssignments().values()) assignedGuilds.add(a.guildId);
+
+        let assigned = 0, failed = 0;
+        const results = [];
+
+        for (const g of guilds) {
+            const guildId = Number(g.guildId);
+            if (assignedGuilds.has(guildId)) continue;
+
+            const district = mapDistrict(g.category);
+            const tier = tierForGuild(g);
+            let plots = worldState.getAvailablePlots(district, tier);
+            if (plots.length === 0) plots = worldState.getAvailablePlots('townsquare', tier);
+            if (plots.length === 0) { failed++; results.push({ guildId, error: 'no plots' }); continue; }
+
+            const plot = plots[0];
+            const result = worldState.assignPlot(plot.plotId, guildId, tier);
+            if (result.ok) {
+                assigned++;
+                broadcast('plot_assigned', { guildId, plotId: plot.plotId, col: plot.col, row: plot.row, tier, district, timestamp: Date.now() });
+                results.push({ guildId, plotId: plot.plotId, district });
+            } else {
+                failed++;
+                results.push({ guildId, error: result.error });
+            }
+        }
+
+        await worldState.savePlotAssignments();
+        res.json({ ok: true, data: { released, assigned, failed, results } });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
 // ═══════════════════════════════════════
 // SSE ENDPOINT
 // ═══════════════════════════════════════
