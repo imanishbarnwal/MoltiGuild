@@ -1410,7 +1410,7 @@ app.post('/api/world/auto-assign', async (req, res) => {
         }
 
         const releaseFirst = req.body?.releaseAll === true;
-        const guilds = await monad.fetchGuilds();
+        const guilds = await monad.getGuildLeaderboard();
         const allAssignments = worldState.getAllAssignments();
 
         // Release all if requested
