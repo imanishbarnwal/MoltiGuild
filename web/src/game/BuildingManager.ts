@@ -8,7 +8,7 @@ const TIER_CONFIG: Record<string, { footprint: number; scale: number }> = {
   tent:      { footprint: 1, scale: 0.35 },
   shack:     { footprint: 1, scale: 0.55 },
   house:     { footprint: 1, scale: 0.60 },
-  townhouse: { footprint: 1, scale: 0.55 },
+  townhouse: { footprint: 1, scale: 0.08 },  // source image is 1824×2336
   workshop:  { footprint: 2, scale: 0.55 },
   tower:     { footprint: 2, scale: 0.65 },
   landmark:  { footprint: 2, scale: 0.75 },

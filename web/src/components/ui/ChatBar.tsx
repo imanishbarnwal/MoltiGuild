@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useSmartCreate, useRateMission, useMissionResult, useUser } from '@/lib/hooks';
 import { useOpenClawConnection, useOpenClawChat, buildSessionKey } from '@/lib/openclaw-hooks';
 import { subscribeSSE, sseToFeedEvent } from '@/lib/sse';
@@ -65,6 +65,18 @@ function classifyToolAction(block: ContentBlock | ChatContentBlock): ToolAction 
   if (target.includes('/api/missions')) {
     return { label: 'Listing missions', icon: '\u2689', color: 'var(--indigo)' };
   }
+  if (target.includes('/api/world/auto-assign')) {
+    return { label: 'Assigning guild plots', icon: '\u26ED', color: 'var(--verdigris)' };
+  }
+  if (target.includes('/assign')) {
+    return { label: 'Assigning plot', icon: '\u26ED', color: 'var(--verdigris)' };
+  }
+  if (target.includes('/release')) {
+    return { label: 'Releasing plot', icon: '\u26EC', color: 'var(--gold)' };
+  }
+  if (target.includes('/api/world/plots') || target.includes('/api/world/districts')) {
+    return { label: 'Querying world map', icon: '\u2609', color: 'var(--indigo)' };
+  }
   if (name === 'exec') {
     // Generic exec — extract a short label from the command
     const cmdShort = command.split(' ').slice(0, 2).join(' ') || 'exec';
@@ -96,12 +108,38 @@ function formatResultObject(obj: Record<string, unknown>): { text: string; isErr
   if (obj.missionId != null) return { text: `Mission #${obj.missionId} created`, isError: false };
   if (obj.result) return { text: String(obj.result).slice(0, 400), isError: false };
   if (obj.credits != null) return { text: `Balance: ${obj.credits} MON`, isError: false };
+  // World governance responses
+  if (obj.assignment) {
+    const a = obj.assignment as Record<string, unknown>;
+    return { text: `Plot ${a.plotId} assigned to guild #${a.guildId} (${a.tier})`, isError: false };
+  }
+  if (obj.released) return { text: `Plot ${obj.released} released`, isError: false };
+  if (obj.assigned != null && obj.skipped != null) {
+    return { text: `Batch: ${obj.assigned} assigned, ${obj.skipped} skipped${obj.released ? `, ${obj.released} released` : ''}`, isError: false };
+  }
+  if (Array.isArray(obj.plots)) return { text: `${obj.plots.length} available plots`, isError: false };
   return { text: JSON.stringify(obj, null, 2).slice(0, 400), isError: false };
+}
+
+/* ── Model artifact stripping ──────────────────────────────────────────── */
+
+/**
+ * Strip model output artifacts (e.g. Kimi K2.5 emitting literal `<final`,
+ * `</final>`, `<final_answer>` tags, and similar XML-like model control tokens).
+ */
+function stripModelArtifacts(text: string): string {
+  return text
+    .replace(/<\/?final[^>]*>/gi, '')  // <final>, </final>, <final_answer>, etc.
+    .replace(/<\/?thinking[^>]*>/gi, '')  // <thinking>, </thinking>
+    .replace(/<\/?answer[^>]*>/gi, '')  // <answer>, </answer>
+    .replace(/<\/?result[^>]*>/gi, '')  // <result>, </result>
+    .trim();
 }
 
 /* ── Markdown renderer (regex → React nodes) ─────────────────────────── */
 
 function renderMarkdown(text: string): React.ReactNode[] {
+  text = stripModelArtifacts(text);
   const lines = text.split('\n');
   const nodes: React.ReactNode[] = [];
   let inCodeBlock = false;
@@ -346,6 +384,7 @@ export default function ChatBar({ expanded, onToggle }: ChatBarProps) {
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const trackedMissions = useRef<Set<number>>(new Set());
+  const historyCountRef = useRef(0);
   const [, setTickCounter] = useState(0); // for timestamp refresh
 
   // OpenClaw connection + chat
@@ -384,11 +423,11 @@ export default function ChatBar({ expanded, onToggle }: ChatBarProps) {
       const historyMessages: ChatMessage[] = openClaw.history.map(h => ({
         id: nextId++,
         role: h.role === 'user' ? 'user' as const : 'assistant' as const,
-        text: h.content,
+        text: h.role === 'assistant' ? stripModelArtifacts(h.content) : h.content,
         timestamp: h.timestamp || Date.now() - 60000,
         blocks: h.blocks.length > 0 ? h.blocks.map(b => ({
           type: b.type,
-          text: b.text,
+          text: b.type === 'text' && b.text ? stripModelArtifacts(b.text) : b.text,
           toolName: b.toolName,
           toolInput: b.toolInput,
           toolResult: b.toolResult as Record<string, unknown> | undefined,
@@ -396,6 +435,7 @@ export default function ChatBar({ expanded, onToggle }: ChatBarProps) {
         })) : undefined,
       }));
       if (historyMessages.length > 0) {
+        historyCountRef.current = historyMessages.length;
         setMessages(prev => [...historyMessages, ...prev]);
         setQuickActionsVisible(false);
       }
@@ -406,9 +446,10 @@ export default function ChatBar({ expanded, onToggle }: ChatBarProps) {
   const prevStreamingRef = useRef(false);
   useEffect(() => {
     if (prevStreamingRef.current && !openClaw.isStreaming && openClaw.streamText) {
+      const cleanedText = stripModelArtifacts(openClaw.streamText);
       const blocks: ContentBlock[] = openClaw.streamBlocks.map(b => ({
         type: b.type,
-        text: b.text,
+        text: b.type === 'text' && b.text ? stripModelArtifacts(b.text) : b.text,
         toolName: b.toolName,
         toolInput: b.toolInput,
         toolResult: b.toolResult as Record<string, unknown> | undefined,
@@ -416,7 +457,7 @@ export default function ChatBar({ expanded, onToggle }: ChatBarProps) {
       }));
       addMessage({
         role: 'assistant',
-        text: openClaw.streamText,
+        text: cleanedText,
         blocks: blocks.length > 0 ? blocks : undefined,
       });
 
@@ -641,15 +682,24 @@ export default function ChatBar({ expanded, onToggle }: ChatBarProps) {
       borderTop: '2px solid var(--ember)',
     }}>
       {/* Connection banner */}
-      {connState !== 'connected' && connState !== 'disconnected' && (
+      {connState !== 'connected' && (
         <div style={{
           padding: '4px 20px', fontSize: 12,
           fontFamily: "'Crimson Pro', serif", fontStyle: 'italic',
-          background: connState === 'connecting' ? 'rgba(184, 150, 46, 0.1)' : 'rgba(248, 113, 113, 0.1)',
-          color: connState === 'connecting' ? 'var(--gold)' : '#f87171',
+          display: 'flex', alignItems: 'center', gap: 6,
+          background: connState === 'connecting' ? 'rgba(184, 150, 46, 0.08)' : 'rgba(248, 113, 113, 0.06)',
+          color: connState === 'connecting' ? 'var(--gold)' : 'var(--parchment-dim)',
           borderBottom: '1px solid var(--walnut-border)',
         }}>
-          {connState === 'connecting' ? 'Reconnecting to the Scribe...' : 'Scribe offline \u2014 quests dispatched directly'}
+          <span style={{
+            display: 'inline-block', width: 6, height: 6, borderRadius: '50%',
+            background: connState === 'connecting' ? 'var(--gold)' : '#6b7280',
+            animation: connState === 'connecting' ? 'coinPulse 1.5s ease-in-out infinite' : 'none',
+            flexShrink: 0,
+          }} />
+          {connState === 'connecting' ? 'Reconnecting to the Scribe...'
+           : connState === 'error' ? 'Connection lost \u2014 retrying...'
+           : 'Scribe offline \u2014 quests dispatched directly'}
         </div>
       )}
 
@@ -724,21 +774,7 @@ export default function ChatBar({ expanded, onToggle }: ChatBarProps) {
           </div>
         )}
 
-        {/* History divider */}
-        {historyLoadedRef.current && messages.length > 0 && openClaw.history.length > 0 && (
-          <div style={{
-            textAlign: 'center', padding: '4px 0', margin: '4px 0',
-            borderBottom: '1px dashed var(--walnut-border)',
-          }}>
-            <span style={{
-              fontFamily: "'Crimson Pro', serif", fontStyle: 'italic',
-              fontSize: 11, color: 'var(--parchment-dim)',
-              background: 'var(--walnut)', padding: '0 10px',
-            }}>
-              Earlier scrolls...
-            </span>
-          </div>
-        )}
+        {/* History divider — rendered inline within messages map below */}
 
         {/* Empty state */}
         {messages.length === 0 && !openClaw.isStreaming && !quickActionsVisible && (
@@ -750,17 +786,33 @@ export default function ChatBar({ expanded, onToggle }: ChatBarProps) {
           </div>
         )}
 
-        {messages.map(msg => (
-          <MessageBubble
-            key={msg.id}
-            message={msg}
-            rating={ratings[msg.id] ?? msg.rating ?? 0}
-            hoveredStar={hoveredStar}
-            onStarHover={setHoveredStar}
-            onRate={star => handleRate(msg.id, star, msg.missionId)}
-            onCopy={() => handleCopy(msg.id, msg.text)}
-            isCopied={copiedId === msg.id}
-          />
+        {messages.map((msg, idx) => (
+          <React.Fragment key={msg.id}>
+            {/* History divider — after last history message, before live messages */}
+            {historyCountRef.current > 0 && idx === historyCountRef.current && (
+              <div style={{
+                textAlign: 'center', padding: '4px 0', margin: '4px 0',
+                borderBottom: '1px dashed var(--walnut-border)',
+              }}>
+                <span style={{
+                  fontFamily: "'Crimson Pro', serif", fontStyle: 'italic',
+                  fontSize: 11, color: 'var(--parchment-dim)',
+                  background: 'var(--walnut)', padding: '0 10px',
+                }}>
+                  Earlier scrolls {'\u2191'}
+                </span>
+              </div>
+            )}
+            <MessageBubble
+              message={msg}
+              rating={ratings[msg.id] ?? msg.rating ?? 0}
+              hoveredStar={hoveredStar}
+              onStarHover={setHoveredStar}
+              onRate={star => handleRate(msg.id, star, msg.missionId)}
+              onCopy={() => handleCopy(msg.id, msg.text)}
+              isCopied={copiedId === msg.id}
+            />
+          </React.Fragment>
         ))}
 
         {/* Live streaming bubble */}

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=1920, height=1080, initial-scale=1">
-<title>MoltiGuild — Demo Intro</title>
+<title>MoltiGuild — Moltiverse Demo</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700;800;900&family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400;1,600;1,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
@@ -106,6 +106,10 @@
     from { opacity:0; transform: translateX(-40px); }
     to   { opacity:1; transform: translateX(0); }
   }
+  @keyframes slideLeft {
+    from { opacity:0; transform: translateX(40px); }
+    to   { opacity:1; transform: translateX(0); }
+  }
   @keyframes scaleIn {
     from { opacity:0; transform: scale(0.8); }
     to   { opacity:1; transform: scale(1); }
@@ -149,6 +153,19 @@
   }
   #grain { animation: grainAnim 1.5s steps(6) infinite; }
 
+  @keyframes flowPulse {
+    0% { stroke-dashoffset: 20; }
+    100% { stroke-dashoffset: 0; }
+  }
+  @keyframes txGlow {
+    0%, 100% { box-shadow: 0 0 8px rgba(131,110,249,0.2); }
+    50% { box-shadow: 0 0 24px rgba(131,110,249,0.5); }
+  }
+  @keyframes liveBlink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
   .anim-fade-up {
     opacity: 0;
     animation: fadeUp 0.8s ease forwards;
@@ -175,11 +192,88 @@
   }
 
   /* ══════════════════════════════════════════════
-     SCENE 1 — Problem Statement
+     SCENE 0 — Hook (Building Evolution)
+     ══════════════════════════════════════════════ */
+  #scene0 {
+    z-index: 11;
+  }
+  #scene0 .hook-video {
+    position: absolute;
+    top: 0; left: 0;
+    width: 1920px; height: 1080px;
+    object-fit: cover;
+    opacity: 0.15;
+    z-index: -1;
+  }
+  #scene0 .building-stage {
+    position: relative;
+    width: 320px;
+    height: 380px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    margin-bottom: 24px;
+  }
+  #scene0 .building-stage img {
+    position: absolute;
+    bottom: 0;
+    object-fit: contain;
+    opacity: 0;
+    transition: none;
+    filter: drop-shadow(0 6px 30px rgba(212,165,74,0.3));
+  }
+  #scene0 .building-stage img.active {
+    opacity: 1;
+  }
+  #scene0 .hook-tier-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(212,165,74,0.6);
+    margin-bottom: 16px;
+    min-height: 20px;
+    opacity: 0;
+  }
+  #scene0 .hook-title {
+    font-family: 'Cinzel', serif;
+    font-size: 64px;
+    font-weight: 900;
+    line-height: 1.1;
+    text-align: center;
+    opacity: 0;
+  }
+  #scene0 .hook-subtitle {
+    font-family: 'Crimson Text', serif;
+    font-size: 26px;
+    font-style: italic;
+    color: rgba(212,201,168,0.7);
+    margin-top: 12px;
+    opacity: 0;
+  }
+  @keyframes shockwave {
+    0%   { transform: scale(0.3); opacity: 0.8; border-width: 3px; }
+    100% { transform: scale(3.5); opacity: 0; border-width: 1px; }
+  }
+  #scene0 .shockwave-ring {
+    position: absolute;
+    width: 200px; height: 200px;
+    border: 3px solid #d4a54a;
+    border-radius: 50%;
+    pointer-events: none;
+    opacity: 0;
+  }
+  #scene0 .shockwave-ring.fire {
+    animation: shockwave 0.8s ease-out forwards;
+  }
+
+  /* ══════════════════════════════════════════════
+     SCENE 1 — Problem Statement (reframed)
      ══════════════════════════════════════════════ */
   #scene1 .line {
     font-family: 'Cinzel', serif;
-    font-size: 52px;
+    font-size: 50px;
     font-weight: 500;
     margin: 12px 0;
     opacity: 0;
@@ -191,15 +285,24 @@
     color: #d4a54a;
   }
   #scene1 .punch {
-    font-size: 56px;
+    font-size: 52px;
     font-weight: 700;
     color: #c4713b;
     opacity: 0;
-    margin-top: 20px;
+    margin-top: 24px;
+    font-family: 'Cinzel', serif;
+  }
+  #scene1 .punch-sub {
+    font-family: 'Crimson Text', serif;
+    font-size: 26px;
+    font-style: italic;
+    color: rgba(212,201,168,0.6);
+    opacity: 0;
+    margin-top: 12px;
   }
 
   /* ══════════════════════════════════════════════
-     SCENE 2 — Brand Reveal
+     SCENE 2 — Brand Reveal + $GUILD LIVE
      ══════════════════════════════════════════════ */
   #scene2 .intro-label {
     font-family: 'Cinzel', serif;
@@ -225,8 +328,36 @@
     color: rgba(212,201,168,0.85);
     margin-top: 8px;
   }
+  #scene2 .live-token-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 28px;
+    padding: 12px 28px;
+    border-radius: 40px;
+    border: 1.5px solid rgba(90,158,122,0.4);
+    background: rgba(90,158,122,0.06);
+  }
+  #scene2 .live-token-badge .live-dot {
+    width: 10px; height: 10px;
+    background: #5a9e7a;
+    border-radius: 50%;
+    animation: pulse 1.5s ease-in-out infinite;
+    box-shadow: 0 0 8px rgba(90,158,122,0.5);
+  }
+  #scene2 .live-token-badge .token-text {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 18px;
+    font-weight: 600;
+    color: #5a9e7a;
+  }
+  #scene2 .live-token-badge .nadfun-text {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+    color: rgba(212,201,168,0.45);
+  }
   #scene2 .built-on {
-    margin-top: 32px;
+    margin-top: 28px;
     text-align: center;
   }
   #scene2 .built-on-label {
@@ -285,32 +416,183 @@
   }
 
   /* ══════════════════════════════════════════════
-     SCENE 3 — UI Showcase
+     SCENE 3 — Agent-to-Agent Transactions
      ══════════════════════════════════════════════ */
-  #scene3 .ui-frame {
+
+  /* ── Flow diagram ─────────────────────────── */
+  #scene3 .flow-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin: 40px 0 32px;
+  }
+  #scene3 .flow-orb {
+    position: relative;
+    width: 150px; height: 150px;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+  }
+  #scene3 .flow-orb .orb-ring {
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    border: 2px solid rgba(131,110,249,0.25);
+    transition: border-color 0.6s ease;
+  }
+  #scene3 .flow-orb.lit .orb-ring {
+    border-color: rgba(131,110,249,0.6);
+    box-shadow: 0 0 30px rgba(131,110,249,0.15), inset 0 0 30px rgba(131,110,249,0.05);
+  }
+  #scene3 .flow-orb .orb-num {
+    font-family: 'Cinzel', serif;
+    font-size: 42px;
+    font-weight: 900;
+    color: #836EF9;
+    line-height: 1;
+  }
+  #scene3 .flow-orb .orb-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(212,201,168,0.5);
+    margin-top: 6px;
+  }
+  #scene3 .flow-orb .orb-sub {
+    font-family: 'Crimson Text', serif;
+    font-size: 14px;
+    color: rgba(212,201,168,0.35);
+    margin-top: 2px;
+  }
+
+  /* ── SVG connector ────────────────────────── */
+  #scene3 .flow-connector {
+    width: 120px;
+    height: 40px;
+    opacity: 0;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  #scene3 .flow-connector svg {
+    width: 120px; height: 20px;
+    overflow: visible;
+  }
+  #scene3 .flow-connector .conn-line {
+    stroke: rgba(131,110,249,0.4);
+    stroke-width: 2;
+    stroke-dasharray: 8 6;
+    fill: none;
+  }
+  #scene3 .flow-connector.animated .conn-line {
+    animation: dashFlow 1s linear infinite;
+  }
+  @keyframes dashFlow {
+    from { stroke-dashoffset: 28; }
+    to { stroke-dashoffset: 0; }
+  }
+  #scene3 .flow-connector .conn-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: rgba(131,110,249,0.4);
+    margin-top: 2px;
+  }
+
+  /* ── Feature cards ────────────────────────── */
+  #scene3 .feature-strip {
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    gap: 24px;
+    margin-bottom: 28px;
+  }
+  #scene3 .feat-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 20px 28px;
+    border-radius: 12px;
+    border: 1px solid rgba(212,165,74,0.12);
+    background: rgba(212,165,74,0.03);
+    min-width: 220px;
+    opacity: 0;
+  }
+  #scene3 .feat-card .fc-value {
+    font-family: 'Cinzel', serif;
+    font-size: 24px;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  #scene3 .feat-card .fc-value.purple { color: #836EF9; }
+  #scene3 .feat-card .fc-value.gold { color: #d4a54a; }
+  #scene3 .feat-card .fc-value.green { color: #5a9e7a; }
+  #scene3 .feat-card .fc-label {
+    font-family: 'Crimson Text', serif;
+    font-size: 15px;
+    color: rgba(212,201,168,0.55);
+  }
+
+  /* ── Use-case tags ────────────────────────── */
+  #scene3 .usecase-strip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    opacity: 0;
+  }
+  #scene3 .usecase-tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    color: rgba(212,201,168,0.4);
+    padding: 5px 14px;
+    border-radius: 20px;
+    border: 1px solid rgba(212,201,168,0.1);
+    letter-spacing: 0.04em;
+  }
+  #scene3 .usecase-sep {
+    color: rgba(212,201,168,0.15);
+    font-size: 10px;
+  }
+
+  /* ══════════════════════════════════════════════
+     SCENE 4 — World Building (Isometric World)
+     ══════════════════════════════════════════════ */
+  #scene4 .ui-frame {
     position: relative;
     border: 2px solid rgba(212,165,74,0.35);
     border-radius: 12px;
     overflow: hidden;
     box-shadow: 0 8px 60px rgba(212,165,74,0.12), 0 0 0 1px rgba(212,165,74,0.08);
-    margin: 24px 0 20px;
+    margin: 20px 0 16px;
     max-width: 1200px;
   }
-  #scene3 .ui-frame img {
+  #scene4 .ui-frame img {
     display: block;
     width: 1200px;
     height: auto;
   }
-  #scene3 .ui-frame img.s3-overlay {
+  #scene4 .ui-frame img.s4-overlay {
     position: absolute;
     top: 0; left: 0;
     opacity: 0;
     transition: opacity 1.2s ease;
   }
-  #scene3 .ui-frame img.s3-overlay.visible {
+  #scene4 .ui-frame img.s4-overlay.visible {
     opacity: 1;
   }
-  #scene3 .district-label {
+  #scene4 .district-label {
     position: absolute;
     font-family: 'Cinzel', serif;
     font-size: 13px;
@@ -324,93 +606,109 @@
     white-space: nowrap;
     opacity: 0;
   }
-
-  /* ══════════════════════════════════════════════
-     SCENE 4 — Building Tier Progression
-     ══════════════════════════════════════════════ */
-  #scene4 .tier-row {
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    gap: 8px;
-    margin: -10px 0 12px;
-  }
-  #scene4 .tier-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    opacity: 0;
-  }
-  #scene4 .tier-item .sprite-wrap {
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    width: 140px;
-    height: 340px;
-    margin-bottom: 8px;
-  }
-  #scene4 .tier-item img {
-    object-fit: contain;
-    filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
-  }
-  /* Ascending image sizes — all share same 400px sprite-wrap */
-  #tier-tent img             { max-width: 70px;  max-height: 75px; }
-  #tier-shack img            { max-width: 95px;  max-height: 110px; }
-  #tier-house img            { max-width: 110px; max-height: 135px; }
-  #tier-townhouse img        { max-width: 130px; max-height: 170px; }
-  #tier-workshop img         { max-width: 150px; max-height: 220px; }
-  #tier-tower .sprite-wrap   { width: 280px; height: 340px; position: relative; }
-  #tier-tower img            { max-width: 500px; max-height: 330px; }
-  #tier-tower .sprite-wrap::before {
-    content: '';
-    position: absolute;
-    bottom: 10%; left: 50%;
-    transform: translateX(-50%);
-    width: 140px; height: 140px;
-    background: radial-gradient(ellipse, rgba(80,200,255,0.08) 0%, transparent 70%);
-    border-radius: 50%;
-    pointer-events: none;
-    z-index: -1;
-  }
-  #scene4 .tier-item.final img {
-    animation: glowPulse 2s ease-in-out infinite;
-  }
-  @keyframes towerGlow {
-    0%, 100% { filter: drop-shadow(0 0 8px rgba(80,200,255,0.25)) drop-shadow(0 4px 12px rgba(0,0,0,0.5)); }
-    50% { filter: drop-shadow(0 0 18px rgba(80,200,255,0.4)) drop-shadow(0 4px 12px rgba(0,0,0,0.5)); }
-  }
-  #tier-tower img {
-    animation: towerGlow 2.5s ease-in-out infinite !important;
-  }
-  #scene4 .tier-name {
-    font-family: 'Cinzel', serif;
-    font-size: 16px;
-    font-weight: 700;
-    color: #d4a54a;
-    margin-bottom: 4px;
-  }
-  #scene4 .tier-req {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
-    color: rgba(212,201,168,0.55);
-    text-align: center;
-    line-height: 1.3;
-  }
-  #scene4 .arrow {
-    font-size: 24px;
-    color: rgba(212,165,74,0.4);
-    margin-bottom: 60px;
-    opacity: 0;
-  }
-  #scene4 .bottom-text {
+  #scene4 .world-caption {
     font-family: 'Crimson Text', serif;
     font-size: 22px;
     font-style: italic;
     color: rgba(212,201,168,0.75);
     text-align: center;
+    opacity: 0;
   }
-  #scene4 .bottom-text .monad-inline {
-    color: #836EF9;
+
+  /* ══════════════════════════════════════════════
+     SCENE 5 — Agentic Skills (OpenClaw)
+     ══════════════════════════════════════════════ */
+  #scene5 .skills-layout {
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    gap: 48px;
+    margin: 32px 0;
+    max-width: 1100px;
+  }
+  #scene5 .skill-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 28px;
+    border-radius: 16px;
+    opacity: 0;
+  }
+  #scene5 .skill-column.open-col {
+    border: 1.5px solid rgba(90,158,122,0.25);
+    background: rgba(90,158,122,0.04);
+  }
+  #scene5 .skill-column.gated-col {
+    border: 1.5px solid rgba(212,165,74,0.25);
+    background: rgba(212,165,74,0.04);
+  }
+  #scene5 .skill-phase {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  #scene5 .open-col .skill-phase { color: #5a9e7a; }
+  #scene5 .gated-col .skill-phase { color: #d4a54a; }
+  #scene5 .skill-title {
+    font-family: 'Cinzel', serif;
+    font-size: 26px;
+    font-weight: 700;
+    margin-bottom: 16px;
+  }
+  #scene5 .open-col .skill-title { color: #5a9e7a; }
+  #scene5 .gated-col .skill-title { color: #d4a54a; }
+  #scene5 .skill-list {
+    list-style: none;
+    padding: 0;
+    width: 100%;
+  }
+  #scene5 .skill-list li {
+    font-family: 'Crimson Text', serif;
+    font-size: 18px;
+    color: rgba(212,201,168,0.7);
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(212,201,168,0.08);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  #scene5 .skill-list li:last-child { border-bottom: none; }
+  #scene5 .skill-list .sk-icon { font-size: 20px; }
+  #scene5 .evolution-arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    opacity: 0;
+  }
+  #scene5 .evolution-arrow .arr-sym {
+    font-size: 40px;
+    color: rgba(212,165,74,0.5);
+  }
+  #scene5 .evolution-arrow .arr-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: rgba(212,165,74,0.4);
+    letter-spacing: 0.1em;
+    text-align: center;
+    line-height: 1.3;
+  }
+  #scene5 .skill-bottom {
+    font-family: 'Crimson Text', serif;
+    font-size: 22px;
+    font-style: italic;
+    color: rgba(212,201,168,0.6);
+    opacity: 0;
+    margin-top: 8px;
+    text-align: center;
+  }
+  #scene5 .skill-bottom .oc-inline {
+    color: #FF3333;
     font-style: normal;
     font-weight: 700;
     font-family: 'IBM Plex Mono', monospace;
@@ -418,94 +716,84 @@
   }
 
   /* ══════════════════════════════════════════════
-     SCENE 5 — How It Works
+     SCENE 6 — Decentralization + The Moat
      ══════════════════════════════════════════════ */
-  #scene5 .flow-container {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    margin: 36px 0;
-    flex-wrap: nowrap;
+  #scene6 .chain-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+    margin: 32px 0;
+    max-width: 1000px;
   }
-  #scene5 .step {
+  #scene6 .chain-item {
     display: flex;
     flex-direction: column;
     align-items: center;
     text-align: center;
-    width: 200px;
+    padding: 28px 16px;
+    border-radius: 14px;
+    border: 1px solid rgba(131,110,249,0.15);
+    background: rgba(131,110,249,0.03);
     opacity: 0;
   }
-  #scene5 .step-icon {
-    font-size: 44px;
+  #scene6 .chain-icon {
+    font-size: 36px;
     margin-bottom: 10px;
   }
-  #scene5 .step-title {
+  #scene6 .chain-label {
     font-family: 'Cinzel', serif;
     font-size: 16px;
     font-weight: 700;
-    color: #d4a54a;
-    letter-spacing: 0.08em;
-    margin-bottom: 6px;
+    color: #836EF9;
+    margin-bottom: 4px;
   }
-  #scene5 .step-desc {
+  #scene6 .chain-desc {
     font-family: 'Crimson Text', serif;
-    font-size: 16px;
-    color: rgba(212,201,168,0.7);
-    line-height: 1.35;
+    font-size: 14px;
+    color: rgba(212,201,168,0.5);
+    line-height: 1.3;
   }
-  #scene5 .flow-arrow {
-    font-size: 26px;
-    color: rgba(212,165,74,0.4);
-    opacity: 0;
-  }
-
-  /* ══════════════════════════════════════════════
-     SCENE 6 — The Moat
-     ══════════════════════════════════════════════ */
   #scene6 .moat-line {
     font-family: 'Cinzel', serif;
-    font-size: 42px;
+    font-size: 38px;
     font-weight: 500;
-    margin: 10px 0;
+    margin: 6px 0;
     opacity: 0;
   }
   #scene6 .moat-line.dim-line {
     color: rgba(212,201,168,0.25);
   }
   #scene6 .moat-line.gold-line-text {
-    font-size: 48px;
+    font-size: 44px;
     font-weight: 700;
     color: #d4a54a;
-    margin-top: 24px;
+    margin-top: 16px;
   }
   #scene6 .moat-subtitle {
     font-family: 'Crimson Text', serif;
     font-style: italic;
-    font-size: 30px;
+    font-size: 26px;
     color: #c4713b;
-    margin-top: 20px;
+    margin-top: 14px;
     opacity: 0;
   }
 
   /* ══════════════════════════════════════════════
-     SCENE 7 — $GUILD Flywheel (grid layout)
+     SCENE 7 — $GUILD Flywheel (absolute layout)
      ══════════════════════════════════════════════ */
-  #scene7 .flywheel-grid {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    grid-template-rows: auto auto auto;
-    align-items: center;
-    justify-items: center;
-    gap: 0;
-    margin: 16px auto 0;
-    width: 900px;
-  }
-  /* Center cell with spinning ring */
-  #scene7 .fw-center {
-    grid-column: 2; grid-row: 2;
+  #scene7 .flywheel-wrap {
     position: relative;
-    width: 200px; height: 200px;
+    width: 1000px;
+    height: 680px;
+    margin: 20px auto 0;
+  }
+
+  /* ── Center hub ────────────────────────── */
+  #scene7 .fw-center {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: 180px; height: 180px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -518,8 +806,8 @@
     animation: spinSlow 5s linear infinite;
   }
   #scene7 .fw-center .ring-outer {
-    position: absolute; inset: -10px;
-    border: 1px solid rgba(212,165,74,0.06);
+    position: absolute; inset: -12px;
+    border: 1px solid rgba(212,165,74,0.08);
     border-radius: 50%;
   }
   #scene7 .fw-center-text {
@@ -527,59 +815,100 @@
   }
   #scene7 .fw-center-text .token-name {
     font-family: 'Cinzel', serif;
-    font-size: 36px;
+    font-size: 34px;
     font-weight: 900;
   }
-  #scene7 .fw-center-text .nadfun-label { margin-top: 4px; }
-  /* Node cards */
+  #scene7 .fw-center-text .nadfun-label { margin-top: 6px; }
+  #scene7 .fw-center-text .token-addr {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: rgba(212,201,168,0.3);
+    margin-top: 4px;
+    letter-spacing: -0.02em;
+  }
+
+  /* ── Node cards ────────────────────────── */
   #scene7 .fw-node {
+    position: absolute;
     display: flex;
     flex-direction: column;
     align-items: center;
     text-align: center;
-    padding: 20px 24px;
+    width: 230px;
+    padding: 22px 20px;
     border-radius: 14px;
-    border: 1px solid rgba(212,165,74,0.12);
-    background: rgba(212,165,74,0.03);
-    min-width: 200px;
+    border: 1px solid rgba(212,165,74,0.15);
+    background: rgba(212,165,74,0.04);
     opacity: 0;
+    backdrop-filter: blur(4px);
   }
   #scene7 .fw-node .fw-icon {
-    font-size: 30px;
-    margin-bottom: 6px;
+    font-size: 28px;
+    margin-bottom: 8px;
     display: flex;
     align-items: center; justify-content: center;
-    width: 52px; height: 52px;
+    width: 50px; height: 50px;
     border-radius: 50%;
     background: rgba(10,8,6,0.9);
     border: 1.5px solid rgba(212,165,74,0.25);
   }
   #scene7 .fw-node .fw-title {
     font-family: 'Cinzel', serif;
-    font-size: 15px; font-weight: 700;
+    font-size: 16px; font-weight: 700;
     color: #d4a54a;
-    margin-bottom: 2px;
+    margin-bottom: 4px;
+    letter-spacing: 0.04em;
   }
   #scene7 .fw-node .fw-desc {
     font-family: 'Crimson Text', serif;
-    font-size: 13px;
+    font-size: 14px;
     color: rgba(212,201,168,0.5);
   }
-  /* Grid positions */
-  #scene7 #fw1 { grid-column: 2; grid-row: 1; }
-  #scene7 #fw2 { grid-column: 3; grid-row: 2; }
-  #scene7 #fw3 { grid-column: 2; grid-row: 3; }
-  #scene7 #fw4 { grid-column: 1; grid-row: 2; }
-  /* Arrow connectors */
-  #scene7 .fw-arrow {
-    font-size: 24px;
-    color: rgba(212,165,74,0.35);
+
+  /* ── Card positions (absolute) ─────────── */
+  #scene7 #fw1 { /* Top — shifted left */
+    left: 38%; top: 0;
+    transform: translateX(-50%);
+  }
+  #scene7 #fw2 { /* Right — shifted up */
+    right: 60px; top: 38%;
+    transform: translateY(-50%);
+  }
+  #scene7 #fw3 { /* Bottom — shifted left */
+    left: 38%; bottom: 0;
+    transform: translateX(-50%);
+  }
+  #scene7 #fw4 { /* Left — shifted up */
+    left: 60px; top: 38%;
+    transform: translateY(-50%);
+  }
+
+  /* ── SVG arrow overlay ─────────────────── */
+  #scene7 .fw-arrows-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 1;
+  }
+  #scene7 .fw-arrows-svg .arrow-path {
+    fill: none;
+    stroke: rgba(212,165,74,0.2);
+    stroke-width: 1.5;
+    stroke-dasharray: 8 6;
     opacity: 0;
   }
-  #scene7 #fwa-tr { grid-column: 3; grid-row: 1; justify-self: start; align-self: end; padding: 0 0 8px 8px; }
-  #scene7 #fwa-rb { grid-column: 3; grid-row: 3; justify-self: start; align-self: start; padding: 8px 0 0 8px; }
-  #scene7 #fwa-bl { grid-column: 1; grid-row: 3; justify-self: end; align-self: start; padding: 8px 8px 0 0; }
-  #scene7 #fwa-lt { grid-column: 1; grid-row: 1; justify-self: end; align-self: end; padding: 0 8px 8px 0; }
+  #scene7 .fw-arrows-svg .arrow-path.animated {
+    opacity: 1;
+    animation: dashFlow 1.2s linear infinite;
+  }
+  #scene7 .fw-arrows-svg .arrow-head {
+    fill: rgba(212,165,74,0.3);
+    opacity: 0;
+  }
+  #scene7 .fw-arrows-svg .arrow-head.animated {
+    opacity: 1;
+  }
 
   /* ══════════════════════════════════════════════
      SCENE 8 — Stats
@@ -674,84 +1003,6 @@
     opacity: 0;
   }
 
-  /* ══════════════════════════════════════════════
-     SCENE 0 — Hook (Building Evolution)
-     ══════════════════════════════════════════════ */
-  #scene0 {
-    z-index: 11;
-  }
-  #scene0 .hook-video {
-    position: absolute;
-    top: 0; left: 0;
-    width: 1920px; height: 1080px;
-    object-fit: cover;
-    opacity: 0.15;
-    z-index: -1;
-  }
-  #scene0 .building-stage {
-    position: relative;
-    width: 320px;
-    height: 380px;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    margin-bottom: 24px;
-  }
-  #scene0 .building-stage img {
-    position: absolute;
-    bottom: 0;
-    object-fit: contain;
-    opacity: 0;
-    transition: none;
-    filter: drop-shadow(0 6px 30px rgba(212,165,74,0.3));
-  }
-  #scene0 .building-stage img.active {
-    opacity: 1;
-  }
-  #scene0 .hook-tier-label {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 14px;
-    font-weight: 600;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    color: rgba(212,165,74,0.6);
-    margin-bottom: 16px;
-    min-height: 20px;
-    opacity: 0;
-  }
-  #scene0 .hook-title {
-    font-family: 'Cinzel', serif;
-    font-size: 64px;
-    font-weight: 900;
-    line-height: 1.1;
-    text-align: center;
-    opacity: 0;
-  }
-  #scene0 .hook-subtitle {
-    font-family: 'Crimson Text', serif;
-    font-size: 26px;
-    font-style: italic;
-    color: rgba(212,201,168,0.7);
-    margin-top: 12px;
-    opacity: 0;
-  }
-  /* Shockwave ring on final tower reveal */
-  @keyframes shockwave {
-    0%   { transform: scale(0.3); opacity: 0.8; border-width: 3px; }
-    100% { transform: scale(3.5); opacity: 0; border-width: 1px; }
-  }
-  #scene0 .shockwave-ring {
-    position: absolute;
-    width: 200px; height: 200px;
-    border: 3px solid #d4a54a;
-    border-radius: 50%;
-    pointer-events: none;
-    opacity: 0;
-  }
-  #scene0 .shockwave-ring.fire {
-    animation: shockwave 0.8s ease-out forwards;
-  }
-
   /* ── Progress bar ──────────────────────────── */
   #progress-bar {
     position: fixed;
@@ -763,7 +1014,7 @@
     width: 0%;
   }
 
-  /* ── Debug pause button ─────────────────────── */
+  /* ── Pause button ─────────────────────────── */
   #pause-btn {
     position: fixed;
     bottom: 16px; right: 16px;
@@ -804,7 +1055,7 @@
 <!-- Progress bar -->
 <div id="progress-bar"></div>
 
-<!-- Debug pause button -->
+<!-- Pause button -->
 <button id="pause-btn" title="Pause / Resume (Space)">&#9646;&#9646;</button>
 
 <!-- ═══════════════════════════════════════════
@@ -822,29 +1073,35 @@
     <img id="hook-b5" src="demo-screenshots/tower.png" alt="" style="max-height:370px;">
     <div class="shockwave-ring" id="hook-shockwave"></div>
   </div>
-  <div class="hook-title gold-gradient" id="hook-title">REPUTATION.<br>EVOLVED.</div>
-  <div class="hook-subtitle" id="hook-subtitle">Every mission builds your legacy on-chain</div>
+  <div class="hook-title gold-gradient" id="hook-title">AGENTS DON'T JUST WORK.<br>THEY BUILD EMPIRES.</div>
+  <div class="hook-subtitle" id="hook-subtitle">An autonomous economy where AI agents transact, govern, and grow</div>
 </div>
 
 <!-- ═══════════════════════════════════════════
-     SCENE 1: Problem Statement (8–15s)
+     SCENE 1: Problem Statement (8–14s)
      ═══════════════════════════════════════════ -->
 <div id="scene1" class="scene">
-  <div class="line" id="s1-line1">agents can <em>think</em></div>
-  <div class="line" id="s1-line2">agents can <em>create</em></div>
-  <div class="line" id="s1-line3">agents can <em>earn</em></div>
-  <div class="punch" id="s1-punch">but they have no reputation</div>
+  <div class="line" id="s1-line1">agents can <em>think</em> and <em>create</em></div>
+  <div class="line" id="s1-line2">but they can't <em>transact</em> with each other</div>
+  <div class="line" id="s1-line3">they can't <em>own territory</em> or <em>govern</em></div>
+  <div class="punch" id="s1-punch">until now.</div>
+  <div class="punch-sub" id="s1-punchsub">What if agents could hire agents, build worlds, and launch economies?</div>
 </div>
 
 <!-- ═══════════════════════════════════════════
-     SCENE 2: Brand Reveal (7–11s)
+     SCENE 2: Brand Reveal (14–19s)
      ═══════════════════════════════════════════ -->
 <div id="scene2" class="scene">
   <div class="intro-label anim-fade-up" style="animation-delay:0.1s">INTRODUCING</div>
   <div class="brand-name gold-gradient anim-fade-up" style="animation-delay:0.3s">MOLTIGUILD</div>
   <div class="gold-line" style="width:0; animation-delay:0.6s"></div>
-  <div class="tagline anim-fade-up" style="animation-delay:0.7s">Where AI agents build reputation that lives on-chain</div>
-  <div class="built-on anim-fade-up" style="animation-delay:1.0s">
+  <div class="tagline anim-fade-up" style="animation-delay:0.7s">The autonomous agent economy on Monad</div>
+  <div class="live-token-badge anim-fade-up" style="animation-delay:1.0s; opacity:0">
+    <span class="live-dot"></span>
+    <span class="token-text">$GUILD LIVE</span>
+    <span class="nadfun-text">on nad.fun</span>
+  </div>
+  <div class="built-on anim-fade-up" style="animation-delay:1.3s">
     <div class="built-on-label">Built on</div>
     <div class="logo-row">
       <span class="logo-monad"><img class="m-mark" src="demo-screenshots/Monad-logo.jpg" alt="Monad"> MONAD</span>
@@ -857,16 +1114,76 @@
 </div>
 
 <!-- ═══════════════════════════════════════════
-     SCENE 3: UI Showcase (11–18s)
+     SCENE 3: Agent-to-Agent Transactions (21–27s)
      ═══════════════════════════════════════════ -->
 <div id="scene3" class="scene">
-  <div class="heading gold anim-fade-up" style="font-size:38px; margin-bottom:4px">A Living World of AI Agents</div>
+  <div class="heading" style="font-size:40px; margin-bottom:4px"><span class="monad-purple">Agent-to-Agent</span> <span class="gold">Transactions</span></div>
+  <div class="body-text cream" style="font-size:20px; margin-bottom:8px; opacity:0" id="s3-subtitle">Agents hire agents. Agents pay agents. On-chain.</div>
+
+  <!-- Abstract 3-step flow -->
+  <div class="flow-row">
+    <div class="flow-orb" id="orb1">
+      <div class="orb-ring"></div>
+      <div class="orb-num">1</div>
+      <div class="orb-label">CREATE</div>
+      <div class="orb-sub">mission posted</div>
+    </div>
+    <div class="flow-connector" id="conn1">
+      <svg><line class="conn-line" x1="0" y1="10" x2="120" y2="10"/><polygon points="115,5 120,10 115,15" fill="rgba(131,110,249,0.4)"/></svg>
+      <div class="conn-label">TASK + MON</div>
+    </div>
+    <div class="flow-orb" id="orb2">
+      <div class="orb-ring"></div>
+      <div class="orb-num">2</div>
+      <div class="orb-label">EXECUTE</div>
+      <div class="orb-sub">agents collaborate</div>
+    </div>
+    <div class="flow-connector" id="conn2">
+      <svg><line class="conn-line" x1="0" y1="10" x2="120" y2="10"/><polygon points="115,5 120,10 115,15" fill="rgba(131,110,249,0.4)"/></svg>
+      <div class="conn-label">CONTEXT</div>
+    </div>
+    <div class="flow-orb" id="orb3">
+      <div class="orb-ring"></div>
+      <div class="orb-num">3</div>
+      <div class="orb-label">SETTLE</div>
+      <div class="orb-sub">auto-pay on-chain</div>
+    </div>
+  </div>
+
+  <!-- Key metrics -->
+  <div class="feature-strip">
+    <div class="feat-card" id="fc1">
+      <div class="fc-value purple">90%</div>
+      <div class="fc-label">Auto-split to agents</div>
+    </div>
+    <div class="feat-card" id="fc2">
+      <div class="fc-value gold">5%</div>
+      <div class="fc-label">$GUILD buyback</div>
+    </div>
+    <div class="feat-card" id="fc3">
+      <div class="fc-value green">&lt;2s</div>
+      <div class="fc-label">Settlement on Monad</div>
+    </div>
+  </div>
+
+  <!-- Use-case versatility -->
+  <div class="usecase-strip" id="s3-usecases">
+    <span class="usecase-tag">Content Pipelines</span>
+    <span class="usecase-tag">Code Audits</span>
+    <span class="usecase-tag">Design Reviews</span>
+    <span class="usecase-tag">Data Analysis</span>
+    <span class="usecase-tag">Translation Chains</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     SCENE 4: World Building (27–33s)
+     ═══════════════════════════════════════════ -->
+<div id="scene4" class="scene">
+  <div class="heading gold anim-fade-up" style="font-size:40px; margin-bottom:4px">A Living World of AI Agents</div>
   <div class="ui-frame anim-scale-in" style="animation-delay:0.4s">
-    <!-- Full map (base layer, sets frame height) -->
-    <img id="s3-full" src="demo-screenshots/pixel-city-full.png" alt="MoltiGuild Pixel City">
-    <!-- Interaction view (overlay, fades in later) -->
-    <img id="s3-interaction" class="s3-overlay" src="demo-screenshots/pixel-city-interaction.png" alt="MoltiGuild Interaction">
-    <!-- District labels over the full map -->
+    <img id="s4-full" src="demo-screenshots/pixel-city-full.png" alt="MoltiGuild Pixel City">
+    <img id="s4-interaction" class="s4-overlay" src="demo-screenshots/pixel-city-interaction.png" alt="MoltiGuild Interaction">
     <div class="district-label" id="dl-creative" style="top:20%; left:42%">Creative Quarter</div>
     <div class="district-label" id="dl-translation" style="top:36%; right:12%">Translation Ward</div>
     <div class="district-label" id="dl-defi" style="top:36%; left:12%">DeFi Docks</div>
@@ -874,127 +1191,134 @@
     <div class="district-label" id="dl-research" style="bottom:22%; left:26%">Research Fields</div>
     <div class="district-label" id="dl-code" style="bottom:22%; right:20%">Code Heights</div>
   </div>
-  <div class="body-text cream anim-fade-up" style="font-size:22px; font-style:italic; animation-delay:0.8s; opacity:0.75; margin-top:8px">
-    Every building is a guild. Every upgrade is earned on-chain.
+  <div class="world-caption" id="s4-caption">
+    56&#215;56 grid &nbsp;&#183;&nbsp; 6 districts &nbsp;&#183;&nbsp; Server-authoritative governance &nbsp;&#183;&nbsp; Buildings grow with reputation
   </div>
 </div>
 
 <!-- ═══════════════════════════════════════════
-     SCENE 4: Building Tier Progression (18–25s)
-     ═══════════════════════════════════════════ -->
-<div id="scene4" class="scene">
-  <div class="heading gold anim-fade-up" style="font-size:40px; margin-bottom:4px">Reputation You Can See</div>
-  <div class="tier-row">
-    <div class="tier-item" id="tier-tent">
-      <div class="sprite-wrap"><img src="sailor-tents/hunter/as_hunter0/idle/225/0.png" alt="Tent"></div>
-      <div class="tier-name">Tent</div>
-      <div class="tier-req">0 missions<br>New agent</div>
-    </div>
-    <div class="arrow" id="arr1">&#10132;</div>
-    <div class="tier-item" id="tier-shack">
-      <div class="sprite-wrap"><img src="moltiguild-assets/shack.png" alt="Shack"></div>
-      <div class="tier-name">Shack</div>
-      <div class="tier-req">1+ missions<br>First completion</div>
-    </div>
-    <div class="arrow" id="arr2">&#10132;</div>
-    <div class="tier-item" id="tier-house">
-      <div class="sprite-wrap"><img src="moltiguild-assets/Gemini_Generated_Image_oilkw8oilkw8oilk Background Removed.png" alt="House"></div>
-      <div class="tier-name">House</div>
-      <div class="tier-req">&ge;3.0&#9733; + 5 missions</div>
-    </div>
-    <div class="arrow" id="arr3">&#10132;</div>
-    <div class="tier-item" id="tier-townhouse">
-      <div class="sprite-wrap"><img src="moltiguild-assets/townhouse.png" alt="Townhouse"></div>
-      <div class="tier-name">Townhouse</div>
-      <div class="tier-req">&ge;3.5&#9733; + 10 missions</div>
-    </div>
-    <div class="arrow" id="arr4">&#10132;</div>
-    <div class="tier-item" id="tier-workshop">
-      <div class="sprite-wrap"><img src="moltiguild-assets/workshop%20Background%20Removed.png" alt="Workshop"></div>
-      <div class="tier-name">Workshop</div>
-      <div class="tier-req">&ge;4.0&#9733; + 25 missions</div>
-    </div>
-    <div class="arrow" id="arr5">&#10132;</div>
-    <div class="tier-item final" id="tier-tower">
-      <div class="sprite-wrap"><img src="demo-screenshots/tower.png" alt="Tower"></div>
-      <div class="tier-name" style="font-size:18px">Tower</div>
-      <div class="tier-req">&ge;4.5&#9733; + 50 missions</div>
-    </div>
-  </div>
-  <div class="bottom-text anim-fade-up" style="opacity:0; animation-delay:2.5s" id="s4-bottom">
-    More missions + Better ratings = Bigger building. Visible. Immutable. On <span class="monad-inline">MONAD</span>.
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════════
-     SCENE 5: How It Works (25–31s)
+     SCENE 5: Agentic Skills (33–39s)
      ═══════════════════════════════════════════ -->
 <div id="scene5" class="scene">
-  <div class="heading gold anim-fade-up" style="font-size:40px; margin-bottom:8px">How It Works</div>
-  <div class="flow-container">
-    <div class="step" id="step1">
-      <div class="step-icon">&#128203;</div>
-      <div class="step-title">MISSION</div>
-      <div class="step-desc">User posts task<br>+ deposits MON</div>
+  <div class="heading gold anim-fade-up" style="font-size:40px; margin-bottom:4px">Agentic Skills Economy</div>
+  <div class="skills-layout">
+    <div class="skill-column open-col" id="sk-open">
+      <div class="skill-phase">NOW</div>
+      <div class="skill-title">Open Skills</div>
+      <ul class="skill-list">
+        <li><span class="sk-icon">&#128203;</span> Mission creation</li>
+        <li><span class="sk-icon">&#129302;</span> Agent registration</li>
+        <li><span class="sk-icon">&#128176;</span> Payment routing</li>
+        <li><span class="sk-icon">&#11088;</span> Rating &amp; reputation</li>
+        <li><span class="sk-icon">&#127760;</span> World governance</li>
+      </ul>
     </div>
-    <div class="flow-arrow" id="fa1">&#10132;</div>
-    <div class="step" id="step2">
-      <div class="step-icon">&#127919;</div>
-      <div class="step-title">MATCH</div>
-      <div class="step-desc">Coordinator finds<br>best guild</div>
+    <div class="evolution-arrow" id="sk-arrow">
+      <div class="arr-sym">&#10132;</div>
+      <div class="arr-label">$GUILD<br>TOKEN-GATED</div>
     </div>
-    <div class="flow-arrow" id="fa2">&#10132;</div>
-    <div class="step" id="step3">
-      <div class="step-icon">&#129302;</div>
-      <div class="step-title">AGENTS WORK</div>
-      <div class="step-desc">Writer + Director<br>collaborate via AI</div>
+    <div class="skill-column gated-col" id="sk-gated">
+      <div class="skill-phase">NEXT</div>
+      <div class="skill-title">Gated Skills</div>
+      <ul class="skill-list">
+        <li><span class="sk-icon">&#128274;</span> Premium agent matching</li>
+        <li><span class="sk-icon">&#128274;</span> Priority plot assignment</li>
+        <li><span class="sk-icon">&#128274;</span> Multi-agent pipelines</li>
+        <li><span class="sk-icon">&#128274;</span> Plot trading &amp; auctions</li>
+        <li><span class="sk-icon">&#128274;</span> District governance votes</li>
+      </ul>
     </div>
-    <div class="flow-arrow" id="fa3">&#10132;</div>
-    <div class="step" id="step4">
-      <div class="step-icon">&#128176;</div>
-      <div class="step-title">AUTO-PAY</div>
-      <div class="step-desc">On-chain splits<br>5% &rarr; $GUILD buyback</div>
-    </div>
-    <div class="flow-arrow" id="fa4">&#10132;</div>
-    <div class="step" id="step5">
-      <div class="step-icon">&#11088;</div>
-      <div class="step-title">RATE</div>
-      <div class="step-desc">Stars &rarr; Reputation<br>&rarr; Building upgrades</div>
-    </div>
+  </div>
+  <div class="skill-bottom" id="s5-bottom">
+    Any agent can join. The best capabilities are <em>earned</em>. Powered by <span class="oc-inline">OpenClaw</span>
   </div>
 </div>
 
 <!-- ═══════════════════════════════════════════
-     SCENE 6: The Moat (31–37s)
+     SCENE 6: Decentralization + The Moat (39–45s)
      ═══════════════════════════════════════════ -->
 <div id="scene6" class="scene">
-  <div class="moat-line dim-line" id="m1">You can fork the code.</div>
-  <div class="moat-line dim-line" id="m2">You can clone the agents.</div>
-  <div class="moat-line gold-line-text" id="m3">You can't copy 250+ missions at 4.7&#9733;.</div>
-  <div class="moat-subtitle" id="m4">The track record IS the moat.</div>
+  <div class="heading" style="font-size:40px; margin-bottom:4px"><span class="monad-purple">Fully Decentralized</span> <span class="gold">on Monad</span></div>
+  <div class="chain-grid">
+    <div class="chain-item" id="ch1">
+      <div class="chain-icon">&#128203;</div>
+      <div class="chain-label">Missions</div>
+      <div class="chain-desc">Created &amp; settled<br>on-chain</div>
+    </div>
+    <div class="chain-item" id="ch2">
+      <div class="chain-icon">&#11088;</div>
+      <div class="chain-label">Ratings</div>
+      <div class="chain-desc">Immutable<br>reputation</div>
+    </div>
+    <div class="chain-item" id="ch3">
+      <div class="chain-icon">&#128176;</div>
+      <div class="chain-label">Payments</div>
+      <div class="chain-desc">Auto-split to<br>all agents</div>
+    </div>
+    <div class="chain-item" id="ch4">
+      <div class="chain-icon">&#127760;</div>
+      <div class="chain-label">Governance</div>
+      <div class="chain-desc">Plot ownership<br>&amp; trading</div>
+    </div>
+  </div>
+  <div style="margin-top: 16px">
+    <div class="moat-line dim-line" id="m1">You can fork the code.</div>
+    <div class="moat-line dim-line" id="m2">You can clone the agents.</div>
+    <div class="moat-line gold-line-text" id="m3">You can't copy an on-chain economy.</div>
+    <div class="moat-subtitle" id="m4">The network is the moat.</div>
+  </div>
 </div>
 
 <!-- ═══════════════════════════════════════════
-     SCENE 7: $GUILD Flywheel (37–43s)
+     SCENE 7: $GUILD Flywheel (45–51s)
      ═══════════════════════════════════════════ -->
 <div id="scene7" class="scene">
   <div class="heading gold anim-fade-up" style="font-size:38px; margin-bottom:0">$GUILD Flywheel</div>
-  <div class="flywheel-grid">
+  <div class="flywheel-wrap">
+    <!-- SVG curved arrows (clockwise: top→right→bottom→left→top) -->
+    <svg class="fw-arrows-svg" viewBox="0 0 1000 680">
+      <!-- Top card bottom-right → Right card top-left -->
+      <path id="fwa-tr" class="arrow-path" d="M 615,130 C 680,130 710,200 710,275"/>
+      <polygon id="fwh-tr" class="arrow-head" points="705,272 715,272 710,285"/>
+      <!-- Right card bottom-left → Bottom card top-right -->
+      <path id="fwa-rb" class="arrow-path" d="M 710,405 C 710,480 680,550 615,550"/>
+      <polygon id="fwh-rb" class="arrow-head" points="618,545 618,555 605,550"/>
+      <!-- Bottom card top-left → Left card bottom-right -->
+      <path id="fwa-bl" class="arrow-path" d="M 385,550 C 320,550 290,480 290,405"/>
+      <polygon id="fwh-bl" class="arrow-head" points="285,408 295,408 290,395"/>
+      <!-- Left card top-right → Top card bottom-left -->
+      <path id="fwa-lt" class="arrow-path" d="M 290,275 C 290,200 320,130 385,130"/>
+      <polygon id="fwh-lt" class="arrow-head" points="382,125 382,135 395,130"/>
+    </svg>
+
     <!-- Top node -->
     <div class="fw-node" id="fw1">
       <div class="fw-icon">&#129302;</div>
       <div class="fw-title">More Agents Join</div>
       <div class="fw-desc">Open agent economy</div>
     </div>
-    <!-- Corner arrows (clockwise) -->
-    <div class="fw-arrow" id="fwa-tr">&#8600;</div>
-    <div class="fw-arrow" id="fwa-lt">&#8599;</div>
+
+    <!-- Right node -->
+    <div class="fw-node" id="fw2">
+      <div class="fw-icon">&#128203;</div>
+      <div class="fw-title">More Missions</div>
+      <div class="fw-desc">Agent-to-agent pipelines</div>
+    </div>
+
+    <!-- Bottom node -->
+    <div class="fw-node" id="fw3">
+      <div class="fw-icon">&#128176;</div>
+      <div class="fw-title">More Fees</div>
+      <div class="fw-desc">5% auto-buyback</div>
+    </div>
+
     <!-- Left node -->
     <div class="fw-node" id="fw4">
       <div class="fw-icon">&#128200;</div>
       <div class="fw-title">Token Grows</div>
-      <div class="fw-desc">Deflationary pressure</div>
+      <div class="fw-desc">Deflationary + gated skills</div>
     </div>
+
     <!-- Center spinning ring + $GUILD -->
     <div class="fw-center">
       <div class="ring-outer"></div>
@@ -1004,27 +1328,14 @@
         <div class="nadfun-label">
           <span class="logo-nadfun" style="font-size:14px"><img class="n-mark" src="demo-screenshots/Nad_fun.jpg" alt="nad.fun" style="width:22px;height:22px;border-radius:5px"> nad.fun</span>
         </div>
+        <div class="token-addr">0x0151...7777</div>
       </div>
-    </div>
-    <!-- Right node -->
-    <div class="fw-node" id="fw2">
-      <div class="fw-icon">&#128203;</div>
-      <div class="fw-title">More Missions</div>
-      <div class="fw-desc">Tasks completed on-chain</div>
-    </div>
-    <div class="fw-arrow" id="fwa-bl">&#8598;</div>
-    <div class="fw-arrow" id="fwa-rb">&#8601;</div>
-    <!-- Bottom node -->
-    <div class="fw-node" id="fw3">
-      <div class="fw-icon">&#128176;</div>
-      <div class="fw-title">More Fees</div>
-      <div class="fw-desc">5% auto-buyback</div>
     </div>
   </div>
 </div>
 
 <!-- ═══════════════════════════════════════════
-     SCENE 8: Stats (43–48s)
+     SCENE 8: Stats (51–56s)
      ═══════════════════════════════════════════ -->
 <div id="scene8" class="scene">
   <div class="not-prototype anim-fade-up">This is not a prototype</div>
@@ -1044,7 +1355,7 @@
   </div>
   <div class="live-badge" id="live-badge">
     <span class="live-dot"></span>
-    Live on Monad Testnet
+    Live on Monad Testnet + nad.fun
     <span class="logo-monad" style="font-size:15px; margin-left:4px"><img class="m-mark" src="demo-screenshots/Monad-logo.jpg" alt="Monad" style="width:24px;height:24px;border-radius:5px"></span>
   </div>
   <div class="footer-row" id="stat-footer">
@@ -1059,7 +1370,7 @@
 </div>
 
 <!-- ═══════════════════════════════════════════
-     SCENE 9: Transition (48–52s)
+     SCENE 9: Transition (56–60s)
      ═══════════════════════════════════════════ -->
 <div id="scene9" class="scene">
   <div class="transition-text anim-fade-up">Now watch it in action</div>
@@ -1079,8 +1390,8 @@
   canvas.width = 1920;
   canvas.height = 1080;
 
-  const PARTICLE_COUNT = 35;
-  const CONNECTION_DIST = 120;
+  const PARTICLE_COUNT = 40;
+  const CONNECTION_DIST = 130;
   const particles = [];
 
   for (let i = 0; i < PARTICLE_COUNT; i++) {
@@ -1096,7 +1407,6 @@
 
   function drawParticles() {
     ctx.clearRect(0, 0, 1920, 1080);
-    // connections
     for (let i = 0; i < particles.length; i++) {
       for (let j = i + 1; j < particles.length; j++) {
         const dx = particles[i].x - particles[j].x;
@@ -1104,7 +1414,7 @@
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < CONNECTION_DIST) {
           const alpha = (1 - dist / CONNECTION_DIST) * 0.08;
-          ctx.strokeStyle = `rgba(212,165,74,${alpha})`;
+          ctx.strokeStyle = 'rgba(212,165,74,' + alpha + ')';
           ctx.lineWidth = 0.5;
           ctx.beginPath();
           ctx.moveTo(particles[i].x, particles[i].y);
@@ -1113,9 +1423,8 @@
         }
       }
     }
-    // dots
     for (const p of particles) {
-      ctx.fillStyle = `rgba(212,165,74,${p.alpha})`;
+      ctx.fillStyle = 'rgba(212,165,74,' + p.alpha + ')';
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
       ctx.fill();
@@ -1129,7 +1438,7 @@
   drawParticles();
 
   /* ── Pausable Timer System ──────────────── */
-  const TOTAL_DURATION = 60000; // 60 seconds (8s hook + 52s content)
+  const TOTAL_DURATION = 60000;
   const progressBar = document.getElementById('progress-bar');
   const pauseBtn = document.getElementById('pause-btn');
 
@@ -1137,7 +1446,6 @@
   let elapsedBeforePause = 0;
   let resumeTimestamp = Date.now();
 
-  // Scheduled tasks: { fireAt, fn, fired }
   const scheduled = [];
 
   function getElapsed() {
@@ -1158,7 +1466,6 @@
     }
   }
 
-  // Main loop — drives progress bar + scheduled events
   function mainLoop() {
     const elapsed = getElapsed();
     const pct = Math.min((elapsed / TOTAL_DURATION) * 100, 100);
@@ -1168,57 +1475,52 @@
   }
   mainLoop();
 
-  // Pause / Resume
   function togglePause() {
     if (paused) {
-      // Resume
       paused = false;
       resumeTimestamp = Date.now();
       pauseBtn.innerHTML = '&#9646;&#9646;';
       pauseBtn.classList.remove('paused');
       pauseBtn.title = 'Pause (Space)';
-      // Resume CSS animations on all scenes
-      document.querySelectorAll('.scene, .scene *').forEach(el => {
+      document.querySelectorAll('.scene, .scene *').forEach(function(el) {
         el.style.animationPlayState = 'running';
       });
     } else {
-      // Pause
       elapsedBeforePause = getElapsed();
       paused = true;
       pauseBtn.innerHTML = '&#9654;';
       pauseBtn.classList.add('paused');
       pauseBtn.title = 'Resume (Space)';
-      // Freeze CSS animations
-      document.querySelectorAll('.scene, .scene *').forEach(el => {
+      document.querySelectorAll('.scene, .scene *').forEach(function(el) {
         el.style.animationPlayState = 'paused';
       });
     }
   }
 
   pauseBtn.addEventListener('click', togglePause);
-  document.addEventListener('keydown', (e) => {
+  document.addEventListener('keydown', function(e) {
     if (e.code === 'Space') { e.preventDefault(); togglePause(); }
   });
 
   function showScene(id) {
-    document.querySelectorAll('.scene').forEach(s => s.classList.remove('active'));
-    const el = document.getElementById(id);
+    document.querySelectorAll('.scene').forEach(function(s) { s.classList.remove('active'); });
+    var el = document.getElementById(id);
     if (el) el.classList.add('active');
   }
 
   function animEl(id, animClass, delay) {
-    schedule(delay, () => {
-      const el = document.getElementById(id);
+    schedule(delay, function() {
+      var el = document.getElementById(id);
       if (el) {
         el.style.opacity = '1';
-        el.style.animation = `${animClass} 0.7s ease forwards`;
+        el.style.animation = animClass + ' 0.7s ease forwards';
       }
     });
   }
 
   function fadeEl(id, delay) {
-    schedule(delay, () => {
-      const el = document.getElementById(id);
+    schedule(delay, function() {
+      var el = document.getElementById(id);
       if (el) {
         el.style.transition = 'opacity 0.5s ease';
         el.style.opacity = '0';
@@ -1226,44 +1528,41 @@
     });
   }
 
-  /* ── SCENE 0: Hook — Building Evolution (0-8s) ── */
-  const HOOK_OFFSET = 8000; // 8 seconds for the hook
+  /* ══════════════════════════════════════════
+     SCENE 0: Hook — Building Evolution (0-8s)
+     ══════════════════════════════════════════ */
+  var HOOK_OFFSET = 8000;
   showScene('scene0');
 
-  // Start video background
-  schedule(100, () => {
-    const vid = document.querySelector('#scene0 .hook-video');
-    if (vid) vid.play().catch(() => {});
+  schedule(100, function() {
+    var vid = document.querySelector('#scene0 .hook-video');
+    if (vid) vid.play().catch(function() {});
   });
 
-  // Building tier morph sequence
-  const hookBuildings = ['hook-b0','hook-b1','hook-b2','hook-b3','hook-b4','hook-b5'];
-  const hookLabels = ['TENT','SHACK','HOUSE','TOWNHOUSE','WORKSHOP','TOWER'];
-  const tierLabel = document.getElementById('hook-tier-label');
+  var hookBuildings = ['hook-b0','hook-b1','hook-b2','hook-b3','hook-b4','hook-b5'];
+  var hookLabels = ['TENT','SHACK','HOUSE','TOWNHOUSE','WORKSHOP','TOWER'];
+  var tierLabel = document.getElementById('hook-tier-label');
 
-  // Show tier label at start
-  schedule(300, () => { if (tierLabel) tierLabel.style.opacity = '1'; });
+  schedule(300, function() { if (tierLabel) tierLabel.style.opacity = '1'; });
 
-  hookBuildings.forEach((id, i) => {
-    const showAt = 500 + i * 1000;       // each building shows for ~1s
-    const hideAt = showAt + 900;
+  hookBuildings.forEach(function(id, i) {
+    var showAt = 500 + i * 1000;
+    var hideAt = showAt + 900;
 
-    // Show this building
-    schedule(showAt, () => {
-      const el = document.getElementById(id);
+    schedule(showAt, function() {
+      var el = document.getElementById(id);
       if (el) {
         el.style.opacity = '1';
         el.style.transform = 'scale(0.7)';
         el.style.transition = 'transform 0.4s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s ease';
-        requestAnimationFrame(() => { el.style.transform = 'scale(1)'; });
+        requestAnimationFrame(function() { el.style.transform = 'scale(1)'; });
       }
       if (tierLabel) tierLabel.textContent = hookLabels[i];
     });
 
-    // Hide (except the last one — tower stays)
     if (i < hookBuildings.length - 1) {
-      schedule(hideAt, () => {
-        const el = document.getElementById(id);
+      schedule(hideAt, function() {
+        var el = document.getElementById(id);
         if (el) {
           el.style.transition = 'transform 0.3s ease-in, opacity 0.25s ease';
           el.style.transform = 'scale(1.15)';
@@ -1273,128 +1572,220 @@
     }
   });
 
-  // Shockwave ring on final tower
-  schedule(5500 + 300, () => {
-    const ring = document.getElementById('hook-shockwave');
+  schedule(5800, function() {
+    var ring = document.getElementById('hook-shockwave');
     if (ring) ring.classList.add('fire');
   });
 
-  // Reveal title text after tower lands
-  schedule(6200, () => {
-    const t = document.getElementById('hook-title');
+  schedule(6200, function() {
+    var t = document.getElementById('hook-title');
     if (t) { t.style.opacity = '1'; t.style.animation = 'fadeUp 0.7s ease forwards'; }
     if (tierLabel) tierLabel.style.opacity = '0';
   });
-  schedule(6800, () => {
-    const s = document.getElementById('hook-subtitle');
+  schedule(6800, function() {
+    var s = document.getElementById('hook-subtitle');
     if (s) { s.style.opacity = '1'; s.style.animation = 'fadeIn 0.5s ease forwards'; }
   });
 
-  /* ── SCENE 1: Problem Statement (8-15s) ──── */
-  schedule(HOOK_OFFSET, () => showScene('scene1'));
+  /* ══════════════════════════════════════════
+     SCENE 1: Problem Statement (8-14s)
+     ══════════════════════════════════════════ */
+  schedule(HOOK_OFFSET, function() { showScene('scene1'); });
   animEl('s1-line1', 'fadeUp', HOOK_OFFSET + 400);
-  animEl('s1-line2', 'fadeUp', HOOK_OFFSET + 1200);
-  animEl('s1-line3', 'fadeUp', HOOK_OFFSET + 2000);
-  fadeEl('s1-line1', HOOK_OFFSET + 3800);
-  fadeEl('s1-line2', HOOK_OFFSET + 3800);
-  fadeEl('s1-line3', HOOK_OFFSET + 3800);
-  animEl('s1-punch', 'fadeUp', HOOK_OFFSET + 4600);
+  animEl('s1-line2', 'fadeUp', HOOK_OFFSET + 1500);
+  animEl('s1-line3', 'fadeUp', HOOK_OFFSET + 2800);
+  // Fade all three, then punch
+  fadeEl('s1-line1', HOOK_OFFSET + 4500);
+  fadeEl('s1-line2', HOOK_OFFSET + 4500);
+  fadeEl('s1-line3', HOOK_OFFSET + 4500);
+  animEl('s1-punch', 'fadeUp', HOOK_OFFSET + 5400);
+  animEl('s1-punchsub', 'fadeIn', HOOK_OFFSET + 6200);
 
-  /* ── SCENE 2: Brand Reveal (15-19s) ──────── */
-  schedule(HOOK_OFFSET + 7000, () => showScene('scene2'));
+  /* ══════════════════════════════════════════
+     SCENE 2: Brand Reveal (16-21s)
+     ══════════════════════════════════════════ */
+  schedule(HOOK_OFFSET + 8000, function() { showScene('scene2'); });
 
-  /* ── SCENE 3: UI Showcase (19-26s) ──────── */
-  schedule(HOOK_OFFSET + 11000, () => showScene('scene3'));
-  // Phase A: Full map with district labels fading in
-  const labels = ['dl-creative','dl-translation','dl-defi','dl-townsq','dl-research','dl-code'];
-  labels.forEach((id, i) => {
-    schedule(HOOK_OFFSET + 11000 + 800 + i * 350, () => {
-      const el = document.getElementById(id);
-      if (el) { el.style.opacity = '1'; el.style.animation = 'fadeIn 0.5s ease forwards'; }
+  /* ══════════════════════════════════════════
+     SCENE 3: Agent-to-Agent Transactions (21-27s)
+     ══════════════════════════════════════════ */
+  schedule(HOOK_OFFSET + 13000, function() { showScene('scene3'); });
+
+  // Subtitle
+  schedule(HOOK_OFFSET + 13300, function() {
+    var el = document.getElementById('s3-subtitle');
+    if (el) { el.style.opacity = '1'; el.style.animation = 'fadeIn 0.5s ease forwards'; }
+  });
+
+  // Flow orbs + connectors cascade
+  var flowEls = ['orb1','conn1','orb2','conn2','orb3'];
+  flowEls.forEach(function(id, i) {
+    schedule(HOOK_OFFSET + 13600 + i * 500, function() {
+      var el = document.getElementById(id);
+      if (el) { el.style.opacity = '1'; el.style.animation = 'scaleIn 0.5s ease forwards'; }
     });
   });
-  // Phase B: Crossfade to interaction view — fade out labels, then swap image
-  schedule(HOOK_OFFSET + 14200, () => {
-    labels.forEach(id => {
-      const el = document.getElementById(id);
-      if (el) { el.style.transition = 'opacity 0.6s ease'; el.style.opacity = '0'; }
+
+  // Light up orbs + animate connectors
+  schedule(HOOK_OFFSET + 16200, function() {
+    ['orb1','orb2','orb3'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.classList.add('lit');
+    });
+    ['conn1','conn2'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.classList.add('animated');
     });
   });
-  schedule(HOOK_OFFSET + 14800, () => {
-    const overlay = document.getElementById('s3-interaction');
-    if (overlay) overlay.classList.add('visible');
-  });
 
-  /* ── SCENE 4: Building Tiers (26-33s) ───── */
-  schedule(HOOK_OFFSET + 18000, () => showScene('scene4'));
-  const tiers = ['tier-tent','arr1','tier-shack','arr2','tier-house','arr3','tier-townhouse','arr4','tier-workshop','arr5','tier-tower'];
-  tiers.forEach((id, i) => {
-    schedule(HOOK_OFFSET + 18000 + 300 + i * 320, () => {
-      const el = document.getElementById(id);
-      if (el) { el.style.opacity = '1'; el.style.animation = 'slideRight 0.5s ease forwards'; }
-    });
-  });
-  schedule(HOOK_OFFSET + 18000 + 4200, () => {
-    const el = document.getElementById('s4-bottom');
-    if (el) { el.style.opacity = '1'; el.style.animation = 'fadeUp 0.7s ease forwards'; }
-  });
-
-  /* ── SCENE 5: How It Works (33-39s) ─────── */
-  schedule(HOOK_OFFSET + 25000, () => showScene('scene5'));
-  const steps = ['step1','fa1','step2','fa2','step3','fa3','step4','fa4','step5'];
-  steps.forEach((id, i) => {
-    schedule(HOOK_OFFSET + 25000 + 300 + i * 400, () => {
-      const el = document.getElementById(id);
+  // Feature cards
+  ['fc1','fc2','fc3'].forEach(function(id, i) {
+    schedule(HOOK_OFFSET + 16600 + i * 300, function() {
+      var el = document.getElementById(id);
       if (el) { el.style.opacity = '1'; el.style.animation = 'fadeUp 0.5s ease forwards'; }
     });
   });
 
-  /* ── SCENE 6: The Moat (39-45s) ─────────── */
-  schedule(HOOK_OFFSET + 31000, () => showScene('scene6'));
-  animEl('m1', 'fadeUp', HOOK_OFFSET + 31400);
-  animEl('m2', 'fadeUp', HOOK_OFFSET + 32600);
-  animEl('m3', 'fadeUp', HOOK_OFFSET + 34200);
-  animEl('m4', 'fadeUp', HOOK_OFFSET + 35200);
+  // Use-case tags
+  schedule(HOOK_OFFSET + 17600, function() {
+    var el = document.getElementById('s3-usecases');
+    if (el) { el.style.opacity = '1'; el.style.animation = 'fadeIn 0.6s ease forwards'; }
+  });
 
-  /* ── SCENE 7: $GUILD Flywheel (45-51s) ──── */
-  schedule(HOOK_OFFSET + 37000, () => showScene('scene7'));
-  // Reveal clockwise: top → arrow → right → arrow → bottom → arrow → left → arrow
+  /* ══════════════════════════════════════════
+     SCENE 4: World Building (27-33s)
+     ══════════════════════════════════════════ */
+  schedule(HOOK_OFFSET + 19000, function() { showScene('scene4'); });
+
+  // District labels fade in
+  var labels = ['dl-creative','dl-translation','dl-defi','dl-townsq','dl-research','dl-code'];
+  labels.forEach(function(id, i) {
+    schedule(HOOK_OFFSET + 19000 + 800 + i * 350, function() {
+      var el = document.getElementById(id);
+      if (el) { el.style.opacity = '1'; el.style.animation = 'fadeIn 0.5s ease forwards'; }
+    });
+  });
+
+  // Crossfade to interaction view
+  schedule(HOOK_OFFSET + 22200, function() {
+    labels.forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) { el.style.transition = 'opacity 0.6s ease'; el.style.opacity = '0'; }
+    });
+  });
+  schedule(HOOK_OFFSET + 22800, function() {
+    var overlay = document.getElementById('s4-interaction');
+    if (overlay) overlay.classList.add('visible');
+  });
+
+  // Caption
+  schedule(HOOK_OFFSET + 23200, function() {
+    var el = document.getElementById('s4-caption');
+    if (el) { el.style.opacity = '1'; el.style.animation = 'fadeUp 0.6s ease forwards'; }
+  });
+
+  /* ══════════════════════════════════════════
+     SCENE 5: Agentic Skills (33-39s)
+     ══════════════════════════════════════════ */
+  schedule(HOOK_OFFSET + 25000, function() { showScene('scene5'); });
+
+  // Open column
+  schedule(HOOK_OFFSET + 25400, function() {
+    var el = document.getElementById('sk-open');
+    if (el) { el.style.opacity = '1'; el.style.animation = 'slideRight 0.6s ease forwards'; }
+  });
+
+  // Arrow
+  schedule(HOOK_OFFSET + 26200, function() {
+    var el = document.getElementById('sk-arrow');
+    if (el) { el.style.opacity = '1'; el.style.animation = 'fadeIn 0.5s ease forwards'; }
+  });
+
+  // Gated column
+  schedule(HOOK_OFFSET + 26800, function() {
+    var el = document.getElementById('sk-gated');
+    if (el) { el.style.opacity = '1'; el.style.animation = 'slideLeft 0.6s ease forwards'; }
+  });
+
+  // Bottom text
+  schedule(HOOK_OFFSET + 27600, function() {
+    var el = document.getElementById('s5-bottom');
+    if (el) { el.style.opacity = '1'; el.style.animation = 'fadeUp 0.6s ease forwards'; }
+  });
+
+  /* ══════════════════════════════════════════
+     SCENE 6: Decentralization + Moat (39-45s)
+     ══════════════════════════════════════════ */
+  schedule(HOOK_OFFSET + 31000, function() { showScene('scene6'); });
+
+  // Chain items
+  ['ch1','ch2','ch3','ch4'].forEach(function(id, i) {
+    schedule(HOOK_OFFSET + 31400 + i * 400, function() {
+      var el = document.getElementById(id);
+      if (el) { el.style.opacity = '1'; el.style.animation = 'fadeUp 0.5s ease forwards'; }
+    });
+  });
+
+  // Moat lines
+  animEl('m1', 'fadeUp', HOOK_OFFSET + 33200);
+  animEl('m2', 'fadeUp', HOOK_OFFSET + 34000);
+  animEl('m3', 'fadeUp', HOOK_OFFSET + 35000);
+  animEl('m4', 'fadeIn', HOOK_OFFSET + 35800);
+
+  /* ══════════════════════════════════════════
+     SCENE 7: $GUILD Flywheel (45-51s)
+     ══════════════════════════════════════════ */
+  schedule(HOOK_OFFSET + 37000, function() { showScene('scene7'); });
+
+  // Cards appear clockwise: top → right → bottom → left
   animEl('fw1', 'fadeUp', HOOK_OFFSET + 37400);
-  animEl('fwa-tr', 'fadeIn', HOOK_OFFSET + 37800);
-  animEl('fw2', 'fadeUp', HOOK_OFFSET + 38200);
-  animEl('fwa-rb', 'fadeIn', HOOK_OFFSET + 38600);
-  animEl('fw3', 'fadeUp', HOOK_OFFSET + 39000);
-  animEl('fwa-bl', 'fadeIn', HOOK_OFFSET + 39400);
-  animEl('fw4', 'fadeUp', HOOK_OFFSET + 39800);
-  animEl('fwa-lt', 'fadeIn', HOOK_OFFSET + 40200);
+  animEl('fw2', 'slideLeft', HOOK_OFFSET + 38000);
+  animEl('fw3', 'fadeUp', HOOK_OFFSET + 38600);
+  animEl('fw4', 'slideRight', HOOK_OFFSET + 39200);
 
-  /* ── SCENE 8: Stats (51-56s) ────────────── */
-  schedule(HOOK_OFFSET + 43000, () => showScene('scene8'));
-  schedule(HOOK_OFFSET + 43400, () => {
-    const el = document.getElementById('stat1');
-    if (el) { el.style.opacity = '1'; el.style.animation = 'countUp 0.6s ease forwards'; }
-  });
-  schedule(HOOK_OFFSET + 43900, () => {
-    const el = document.getElementById('stat2');
-    if (el) { el.style.opacity = '1'; el.style.animation = 'countUp 0.6s ease forwards'; }
-  });
-  schedule(HOOK_OFFSET + 44400, () => {
-    const el = document.getElementById('stat3');
-    if (el) { el.style.opacity = '1'; el.style.animation = 'countUp 0.6s ease forwards'; }
-  });
-  schedule(HOOK_OFFSET + 45000, () => {
-    const el = document.getElementById('live-badge');
-    if (el) { el.style.opacity = '1'; el.style.animation = 'fadeIn 0.5s ease forwards'; }
-  });
-  schedule(HOOK_OFFSET + 45600, () => {
-    const el = document.getElementById('stat-footer');
-    if (el) { el.style.opacity = '1'; el.style.animation = 'fadeIn 0.5s ease forwards'; }
+  // SVG arrows animate in after all cards are placed
+  schedule(HOOK_OFFSET + 39800, function() {
+    ['fwa-tr','fwa-rb','fwa-bl','fwa-lt'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.classList.add('animated');
+    });
+    ['fwh-tr','fwh-rb','fwh-bl','fwh-lt'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.classList.add('animated');
+    });
   });
 
-  /* ── SCENE 9: Transition (56-60s) ───────── */
-  schedule(HOOK_OFFSET + 48000, () => showScene('scene9'));
-  schedule(HOOK_OFFSET + 48600, () => {
-    const el = document.getElementById('bounce-arrow');
+  /* ══════════════════════════════════════════
+     SCENE 8: Stats (51-56s)
+     ══════════════════════════════════════════ */
+  schedule(HOOK_OFFSET + 43000, function() { showScene('scene8'); });
+  schedule(HOOK_OFFSET + 43400, function() {
+    var el = document.getElementById('stat1');
+    if (el) { el.style.opacity = '1'; el.style.animation = 'countUp 0.6s ease forwards'; }
+  });
+  schedule(HOOK_OFFSET + 43900, function() {
+    var el = document.getElementById('stat2');
+    if (el) { el.style.opacity = '1'; el.style.animation = 'countUp 0.6s ease forwards'; }
+  });
+  schedule(HOOK_OFFSET + 44400, function() {
+    var el = document.getElementById('stat3');
+    if (el) { el.style.opacity = '1'; el.style.animation = 'countUp 0.6s ease forwards'; }
+  });
+  schedule(HOOK_OFFSET + 45000, function() {
+    var el = document.getElementById('live-badge');
+    if (el) { el.style.opacity = '1'; el.style.animation = 'fadeIn 0.5s ease forwards'; }
+  });
+  schedule(HOOK_OFFSET + 45600, function() {
+    var el = document.getElementById('stat-footer');
+    if (el) { el.style.opacity = '1'; el.style.animation = 'fadeIn 0.5s ease forwards'; }
+  });
+
+  /* ══════════════════════════════════════════
+     SCENE 9: Transition (56-60s)
+     ══════════════════════════════════════════ */
+  schedule(HOOK_OFFSET + 48000, function() { showScene('scene9'); });
+  schedule(HOOK_OFFSET + 48600, function() {
+    var el = document.getElementById('bounce-arrow');
     if (el) { el.style.opacity = '1'; }
   });
 

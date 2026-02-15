@@ -14,7 +14,7 @@ const GUILD_TIER_CONFIG: Record<string, {
 }> = {
   bronze: {
     sprites: ['guild-bronze'],
-    scale: 0.55,
+    scale: 0.05,   // source image is 2816×1536; others are ~256×140
     footprint: 1,
     tint: null,
     glowColor: null,

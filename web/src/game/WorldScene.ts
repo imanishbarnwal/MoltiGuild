@@ -25,8 +25,7 @@ export class WorldScene extends Phaser.Scene {
   private buildingPositions: { gx: number; gy: number }[] = [];
   private buildingSprites: Phaser.GameObjects.Image[] = [];
   private waterSprites: Phaser.GameObjects.Image[] = [];
-  private debugEl: HTMLDivElement | null = null;
-  /** Maps "col,row" → list of asset keys placed on that tile (for debug overlay). */
+  /** Maps "col,row" → list of asset keys placed on that tile. */
   private tileAssets: Map<string, string[]> = new Map();
 
   constructor() {
@@ -88,6 +87,8 @@ export class WorldScene extends Phaser.Scene {
   }
 
   create(): void {
+    this.game.events.emit('load-progress', 0.20, 'Generating textures...');
+
     // Create programmatic textures (grass fallback, water, shadow)
     this.createGrassTileTextures();
     this.createWaterTileTextures();
@@ -95,6 +96,8 @@ export class WorldScene extends Phaser.Scene {
 
     // Background gradient (depth -10, fixed to camera)
     this.createBackgroundGradient();
+
+    this.game.events.emit('load-progress', 0.35, 'Initializing world...');
 
     this.tilemapManager = new TilemapManager(this);
     this.cameraController = new CameraController(
@@ -106,8 +109,12 @@ export class WorldScene extends Phaser.Scene {
     this.guildHallManager = new GuildHallManager(this);
     this.particleManager = new ParticleManager(this);
 
+    this.game.events.emit('load-progress', 0.45, 'Laying terrain...');
+
     // Lay terrain tiles per biome (depth 0, below district color overlay)
     this.placeTerrainTiles();
+
+    this.game.events.emit('load-progress', 0.55, 'Placing decorations...');
 
     // Scatter mountain peaks across Code Heights
     this.placeTranslationMountains();
@@ -179,8 +186,7 @@ export class WorldScene extends Phaser.Scene {
       );
     }
 
-    // HTML debug overlay (outside Phaser canvas)
-    this.createDebugOverlay();
+    this.game.events.emit('load-progress', 0.70, 'Finalizing scene...');
 
     // Signal to React bridge that scene is fully created and ready for worldState
     this.game.events.emit('scene-created');
@@ -189,24 +195,8 @@ export class WorldScene extends Phaser.Scene {
   update(_time: number, delta: number): void {
     this.cinematicIntro?.update(_time, delta);
 
-    // Update HTML debug overlay
-    if (this.debugEl && this.tilemapManager) {
-      const pointer = this.input.activePointer;
-      const cell = this.tilemapManager.screenToGrid(pointer.worldX, pointer.worldY);
-
-      if (cell) {
-        const key = `${cell.col},${cell.row}`;
-        const assets = this.tileAssets.get(key);
-        const assetStr = assets && assets.length > 0 ? assets.join(', ') : 'none';
-        const biome = this.tilemapManager.getDistrictBiome(cell.col, cell.row) ?? '—';
-        this.debugEl.textContent = `Tile: (${cell.col}, ${cell.row})  |  Biome: ${biome}  |  Assets: ${assetStr}`;
-      } else {
-        this.debugEl.textContent = `Tile: —`;
-      }
-    }
   }
 
-  /** Record an asset key placed on a grid tile for the debug overlay. */
   /** Decoration prefixes that should block building placement. */
   private static readonly DECORATION_PREFIXES = [
     'deco-', 'tile-mountain', 'tile-lava', 'tile-meadow',
@@ -224,13 +214,6 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  private createDebugOverlay(): void {
-    const el = document.createElement('div');
-    el.id = 'phaser-debug';
-    el.style.cssText = 'position:fixed;top:8px;left:8px;z-index:9999;font:13px/1.4 monospace;color:#00ff88;background:rgba(0,0,0,0.75);padding:6px 10px;border-radius:4px;pointer-events:none;';
-    document.body.appendChild(el);
-    this.debugEl = el;
-  }
 
   /**
    * Create diamond-clipped grass tile textures from the dark grass image.
@@ -964,7 +947,5 @@ export class WorldScene extends Phaser.Scene {
     this.particleManager?.destroy();
     this.minimapManager?.destroy();
     this.treeManager?.destroy();
-    this.debugEl?.remove();
-    this.debugEl = null;
   }
 }

@@ -445,6 +445,41 @@ function computeDecorationTiles(districtTiles, districtBounds, roadTiles, waterT
     }
   }
 
+  // ── Lava gradient in DeFi Docks (dist 0-4 from water stream) ──
+  // Mirrors WorldScene.placeDefiLavaGradient() — lava tiles are unbuildable
+  {
+    const defiTiles = districtTiles.get('defi');
+    if (defiTiles && defiTiles.size > 0) {
+      // Collect water tiles in DeFi as the lava stream core
+      const defiWater = new Set();
+      const allDefi = [];
+      for (const k of defiTiles) {
+        const [c, r] = k.split(',').map(Number);
+        allDefi.push({ col: c, row: r, key: k });
+        if (waterTiles.has(k)) defiWater.add(k);
+      }
+
+      // Calculate Manhattan distance from each tile to nearest water tile
+      for (const t of allDefi) {
+        if (defiWater.has(t.key)) {
+          // Water tiles (dist 0) are already blocked by the water set
+          decorations.add(t.key);
+          continue;
+        }
+        let minDist = Infinity;
+        for (const wk of defiWater) {
+          const [wc, wr] = wk.split(',').map(Number);
+          const d = Math.abs(t.col - wc) + Math.abs(t.row - wr);
+          if (d < minDist) minDist = d;
+        }
+        // Lava overlays at dist 1-4 from stream (matches WorldScene thresholds)
+        if (minDist <= 4) {
+          decorations.add(t.key);
+        }
+      }
+    }
+  }
+
   // ── Fountain at Town Square center ──
   if (districtBounds['townsquare']) {
     const b = districtBounds['townsquare'];

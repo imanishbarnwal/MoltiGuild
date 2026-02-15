@@ -517,7 +517,18 @@ export async function fetchHistory(sessionKey: string, limit = 50): Promise<Hist
     const messages = (payload.messages as Array<Record<string, unknown>>) ?? [];
 
     return messages.map(msg => {
-      const rawBlocks = msg.content as Array<Record<string, unknown>> | undefined;
+      // User messages may have content as a plain string; assistant messages use block arrays
+      const rawContent = msg.content;
+      if (typeof rawContent === 'string') {
+        return {
+          role: (msg.role as 'user' | 'assistant') ?? 'user',
+          content: rawContent,
+          blocks: [],
+          timestamp: msg.timestamp as number | undefined,
+        };
+      }
+
+      const rawBlocks = rawContent as Array<Record<string, unknown>> | undefined;
       const blocks = parseRawBlocks(rawBlocks);
       const textParts = blocks.filter(b => b.type === 'text' && b.text).map(b => b.text!);
 

@@ -11,14 +11,17 @@ interface PhaserGameProps {
   onDistrictClick?: (info: { name: string; category: string }) => void;
   onPlotAssigned?: (guildId: number) => void;
   onPlotReleased?: (guildId: number) => void;
+  onProgress?: (pct: number, label: string) => void;
 }
 
-export default function PhaserGame({ worldState, onGuildClick, onEmptyLotClick, onDistrictClick, onPlotAssigned: _onPlotAssigned, onPlotReleased: _onPlotReleased }: PhaserGameProps) {
+export default function PhaserGame({ worldState, onGuildClick, onEmptyLotClick, onDistrictClick, onPlotAssigned: _onPlotAssigned, onPlotReleased: _onPlotReleased, onProgress }: PhaserGameProps) {
   const gameRef = useRef<{ game: InstanceType<typeof import('phaser').Game> } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [inDistrict, setInDistrict] = useState(false);
   const sceneReadyRef = useRef(false);
   const worldStateRef = useRef<WorldState | null>(null);
+  const onProgressRef = useRef(onProgress);
+  onProgressRef.current = onProgress;
 
   useEffect(() => {
     async function initPhaser() {
@@ -42,8 +45,25 @@ export default function PhaserGame({ worldState, onGuildClick, onEmptyLotClick, 
           scene: [WorldScene],
         };
 
+        onProgressRef.current?.(0.05, 'Initializing engine...');
+
         const game = new Phaser.Game(config);
         gameRef.current = { game };
+
+        // Phaser file-loader progress (asset preload 5% → 20%)
+        game.events.on('ready', () => {
+          const scene = game.scene.getScene('WorldScene');
+          if (scene) {
+            scene.load.on('progress', (pct: number) => {
+              onProgressRef.current?.(0.05 + pct * 0.15, 'Loading assets...');
+            });
+          }
+        });
+
+        // WorldScene emits load-progress at milestones during create()
+        game.events.on('load-progress', (pct: number, label: string) => {
+          onProgressRef.current?.(pct, label);
+        });
 
         // Wire up event listeners
         game.events.on('district-clicked', (info: { name: string; category: string }) => {
@@ -75,7 +95,7 @@ export default function PhaserGame({ worldState, onGuildClick, onEmptyLotClick, 
         // Scene emits 'scene-created' after create() completes and all managers are ready
         game.events.on('scene-created', () => {
           sceneReadyRef.current = true;
-          console.log('[PhaserGame] scene-created, worldState:', worldStateRef.current ? `${worldStateRef.current.guilds.length} guilds` : 'null');
+          onProgressRef.current?.(0.75, 'Loading guild data...');
           // Forward current worldState now that the scene is fully initialized
           const scene = game.scene.getScene('WorldScene');
           if (scene && 'updateWorldState' in scene && worldStateRef.current) {
