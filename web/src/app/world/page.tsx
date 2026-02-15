@@ -18,13 +18,14 @@ export default function WorldPage() {
   const { data: stats } = useStats();
   const feed = useSSEFeed();
 
+  // Separate worldState from feed — feed changes shouldn't trigger Phaser re-renders
   const worldState: WorldState | null = useMemo(() => {
     if (!guilds.length && !stats) return null;
     return {
       districts: [],
       guilds,
-      agents: [], // agent buildings handled separately when per-agent data available
-      feed,
+      agents: [],
+      feed: [], // feed passed separately to UIOverlay, not through Phaser
       stats: stats
         ? {
             totalGuilds: stats.guilds,
@@ -35,7 +36,7 @@ export default function WorldPage() {
           }
         : { totalGuilds: 0, totalAgents: 0, totalMissions: 0, totalEarned: '0', avgRating: 0 },
     };
-  }, [guilds, stats, feed]);
+  }, [guilds, stats]);
 
   return (
     <div style={{ width: '100%', height: '100vh', backgroundColor: '#08090e' }}>

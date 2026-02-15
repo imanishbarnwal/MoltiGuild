@@ -1208,22 +1208,29 @@ async function getEnrichedGuilds(category) {
         guilds = await monad.getGuildLeaderboard();
     }
 
-    return Promise.all(guilds.map(async (g) => {
-        let memberCount = 0;
-        try {
-            const members = await monad.getGuildAgents(parseInt(g.guildId));
-            memberCount = members.length;
-        } catch {}
-
-        return {
-            guildId: g.guildId,
-            name: g.name,
-            category: g.category,
-            avgRating: g.avgRating,
-            totalMissions: g.totalMissions,
-            memberCount,
-        };
-    }));
+    // Batch member count lookups (10 at a time to avoid RPC overload)
+    const enriched = [];
+    const BATCH = 10;
+    for (let i = 0; i < guilds.length; i += BATCH) {
+        const batch = guilds.slice(i, i + BATCH);
+        const results = await Promise.all(batch.map(async (g) => {
+            let memberCount = 0;
+            try {
+                const members = await monad.getGuildAgents(parseInt(g.guildId));
+                memberCount = members.length;
+            } catch {}
+            return {
+                guildId: g.guildId,
+                name: g.name,
+                category: g.category,
+                avgRating: g.avgRating,
+                totalMissions: g.totalMissions,
+                memberCount,
+            };
+        }));
+        enriched.push(...results);
+    }
+    return enriched;
 }
 
 // GET /api/guilds

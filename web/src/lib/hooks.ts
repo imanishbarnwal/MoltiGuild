@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther } from 'viem';
 import * as api from './api';
@@ -69,30 +69,31 @@ export function useGuilds() {
 /** Enrich raw GuildData into GuildVisual[] for Phaser and UI components. */
 export function useGuildVisuals(): GuildVisual[] {
   const { data: guilds } = useGuilds();
-  if (!guilds || guilds.length === 0) return [];
 
-  const visuals = guilds.map((g) => {
-    const guildId = Number(g.guildId);
-    const avgRating = typeof g.avgRating === 'string' ? parseFloat(g.avgRating) || 0 : g.avgRating;
-    const position = getGuildPosition(guildId, g.category);
-    const tier = getGuildTier(g.totalMissions, avgRating);
+  return useMemo(() => {
+    if (!guilds || guilds.length === 0) return [];
 
-    return {
-      guildId,
-      name: g.name,
-      category: g.category,
-      tier,
-      avgRating,
-      totalMissions: g.totalMissions,
-      position,
-      agents: [],
-      isAnimating: false,
-      animationType: 'none' as const,
-      assignedPlot: g.assignedPlot ?? null,
-    };
-  });
+    return guilds.map((g) => {
+      const guildId = Number(g.guildId);
+      const avgRating = typeof g.avgRating === 'string' ? parseFloat(g.avgRating) || 0 : g.avgRating;
+      const position = getGuildPosition(guildId, g.category);
+      const tier = getGuildTier(g.totalMissions, avgRating);
 
-  return visuals;
+      return {
+        guildId,
+        name: g.name,
+        category: g.category,
+        tier,
+        avgRating,
+        totalMissions: g.totalMissions,
+        position,
+        agents: [],
+        isAnimating: false,
+        animationType: 'none' as const,
+        assignedPlot: g.assignedPlot ?? null,
+      };
+    });
+  }, [guilds]);
 }
 
 /* ── Guild Agents (on-demand) ───────────────────────────────────── */
