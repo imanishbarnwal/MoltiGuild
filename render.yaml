@@ -77,7 +77,7 @@ services:
       - key: CHAIN_ID
         value: "143"
       - key: GUILD_REGISTRY_ADDRESS
-        sync: false  # v5 mainnet address (set after deploy)
+        value: "0xD72De456b2Aa5217a4Fd2E4d64443Ac92FA28791"
       - key: GOLDSKY_ENDPOINT
         sync: false  # mainnet subgraph (set after deploy)
       - key: EXPLORER_URL

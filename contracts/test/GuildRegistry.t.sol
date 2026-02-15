@@ -3,6 +3,7 @@ pragma solidity ^0.8.27;
 
 import "forge-std/Test.sol";
 import "../src/GuildRegistry.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract GuildRegistryTest is Test {
     GuildRegistry public registry;
@@ -17,7 +18,10 @@ contract GuildRegistryTest is Test {
 
     function setUp() public {
         vm.startPrank(coordinator);
-        registry = new GuildRegistry(coordinator);
+        GuildRegistry impl = new GuildRegistry();
+        bytes memory initData = abi.encodeCall(GuildRegistry.initialize, (coordinator));
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
+        registry = GuildRegistry(address(proxy));
         vm.stopPrank();
 
         vm.deal(agent1, INITIAL_BALANCE);

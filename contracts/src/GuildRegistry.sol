@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.27;
 
-contract GuildRegistry {
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+
+contract GuildRegistry is Initializable, UUPSUpgradeable {
 
     // =========================
     // STRUCTS
@@ -142,10 +145,17 @@ contract GuildRegistry {
         _;
     }
 
-    constructor(address _coordinator) {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(address _coordinator) public initializer {
         coordinator = _coordinator;
         missionTimeout = 1800; // 30 minutes
     }
+
+    function _authorizeUpgrade(address) internal override onlyCoordinator {}
 
     // =========================
     // GUILD LOGIC
