@@ -378,6 +378,16 @@ export class TilemapManager {
 
   /* ── Tile occupation (building footprints) ─────────────────────────── */
 
+  private decorationTiles: Set<string> = new Set();
+
+  public markDecoration(col: number, row: number): void {
+    this.decorationTiles.add(`${Math.round(col)},${Math.round(row)}`);
+  }
+
+  public hasDecoration(col: number, row: number): boolean {
+    return this.decorationTiles.has(`${col},${row}`);
+  }
+
   public occupyTile(col: number, row: number, owner: string, tier: string): boolean {
     const key = `${col},${row}`;
     if (this.occupiedTiles.has(key)) return false;
@@ -388,7 +398,8 @@ export class TilemapManager {
   }
 
   public isOccupied(col: number, row: number): boolean {
-    return this.occupiedTiles.has(`${col},${row}`);
+    const key = `${col},${row}`;
+    return this.occupiedTiles.has(key) || this.decorationTiles.has(key);
   }
 
   public clearOccupation(col: number, row: number): void {

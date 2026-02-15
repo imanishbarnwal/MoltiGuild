@@ -207,11 +207,21 @@ export class WorldScene extends Phaser.Scene {
   }
 
   /** Record an asset key placed on a grid tile for the debug overlay. */
+  /** Decoration prefixes that should block building placement. */
+  private static readonly DECORATION_PREFIXES = [
+    'deco-', 'tile-mountain', 'tile-lava', 'tile-meadow',
+  ];
+
   private trackAsset(col: number, row: number, assetKey: string): void {
     const k = `${col},${row}`;
     const list = this.tileAssets.get(k);
     if (list) list.push(assetKey);
     else this.tileAssets.set(k, [assetKey]);
+
+    // Mark decoration tiles so buildings can't overlap them
+    if (WorldScene.DECORATION_PREFIXES.some(p => assetKey.startsWith(p))) {
+      this.tilemapManager.markDecoration(col, row);
+    }
   }
 
   private createDebugOverlay(): void {

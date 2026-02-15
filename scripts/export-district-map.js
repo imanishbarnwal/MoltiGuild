@@ -277,6 +277,187 @@ function computeRoadAdjacency(tileLookup, roadTiles) {
   return roadAdjacent;
 }
 
+/* ── Decoration tile generation — mirrors WorldScene decoration methods ──── */
+
+/**
+ * Generate all decoration tile positions using the same seeded RNG and
+ * cluster logic as WorldScene.ts. These tiles should be blocked from
+ * building placement server-side.
+ */
+function computeDecorationTiles(districtTiles, districtBounds, roadTiles, waterTiles) {
+  const decorations = new Set();
+
+  // Helper: simple seeded RNG (same as WorldScene uses via noise.ts seededRng)
+  function sceneRng(seed) {
+    return () => {
+      seed |= 0;
+      seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function isRoad(c, r) { return roadTiles.has(`${c},${r}`); }
+  function isWater(c, r) { return waterTiles.has(`${c},${r}`); }
+
+  // ── Mountain peaks in Code Heights (seed 7777) ──
+  {
+    const rand = sceneRng(7777);
+    const tiles = districtTiles.get('code');
+    if (tiles && tiles.size > 0) {
+      const tileArr = Array.from(tiles).map(k => { const [c, r] = k.split(',').map(Number); return { col: c, row: r }; });
+      tileArr.sort((a, b) => a.col - b.col || a.row - b.row);
+      for (let i = tileArr.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [tileArr[i], tileArr[j]] = [tileArr[j], tileArr[i]]; }
+
+      const GROUP_COUNT = 4, GROUP_MIN_DIST_SQ = 36;
+      const groupCenters = [];
+      for (const tile of tileArr) {
+        if (groupCenters.length >= GROUP_COUNT) break;
+        if (isWater(tile.col, tile.row) || isRoad(tile.col, tile.row)) continue;
+        let nearRoad = false;
+        for (let dc = -3; dc <= 3 && !nearRoad; dc++) for (let dr = -3; dr <= 3 && !nearRoad; dr++) if (isRoad(tile.col + dc, tile.row + dr)) nearRoad = true;
+        if (nearRoad) continue;
+        if (groupCenters.some(p => (p.col - tile.col) ** 2 + (p.row - tile.row) ** 2 < GROUP_MIN_DIST_SQ)) continue;
+        groupCenters.push(tile);
+      }
+
+      const placed = new Set();
+      const excluded = new Set(['51,43']);
+      for (const center of groupCenters) {
+        const count = 5 + Math.floor(rand() * 3);
+        const candidates = [];
+        for (let dc = -2; dc <= 2; dc++) for (let dr = -2; dr <= 2; dr++) {
+          const c = center.col + dc, r = center.row + dr, k = `${c},${r}`;
+          if (!tiles.has(k) || placed.has(k) || excluded.has(k) || isWater(c, r) || isRoad(c, r)) continue;
+          candidates.push({ col: c, row: r });
+        }
+        for (let i = candidates.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [candidates[i], candidates[j]] = [candidates[j], candidates[i]]; }
+        let n = 0;
+        for (const t of candidates) { if (n >= count) break; placed.add(`${t.col},${t.row}`); decorations.add(`${t.col},${t.row}`); n++; }
+      }
+    }
+  }
+
+  // ── Lamp posts in Town Square (seed 5555) ──
+  {
+    const rand = sceneRng(5555);
+    const tiles = districtTiles.get('townsquare');
+    if (tiles && tiles.size > 0) {
+      const tileArr = Array.from(tiles).map(k => { const [c, r] = k.split(',').map(Number); return { col: c, row: r }; });
+      for (let i = tileArr.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [tileArr[i], tileArr[j]] = [tileArr[j], tileArr[i]]; }
+      const placed = [];
+      for (const tile of tileArr) {
+        if (placed.length >= 5) break;
+        if (isWater(tile.col, tile.row) || isRoad(tile.col, tile.row)) continue;
+        if (placed.some(p => (p.col - tile.col) ** 2 + (p.row - tile.row) ** 2 < 16)) continue;
+        placed.push(tile);
+        decorations.add(`${tile.col},${tile.row}`);
+      }
+    }
+  }
+
+  // ── Crystals in Research Fields (seed 6283) ──
+  {
+    const rand = sceneRng(6283);
+    const tiles = districtTiles.get('research');
+    if (tiles && tiles.size > 0) {
+      const tileSet = new Set(tiles);
+      const edgeTiles = [];
+      for (const k of tiles) {
+        const [c, r] = k.split(',').map(Number);
+        if (isWater(c, r) || isRoad(c, r)) continue;
+        let nearEdge = false;
+        for (let dc = -2; dc <= 2 && !nearEdge; dc++) for (let dr = -2; dr <= 2 && !nearEdge; dr++) if (!tileSet.has(`${c + dc},${r + dr}`)) nearEdge = true;
+        if (nearEdge) edgeTiles.push({ col: c, row: r });
+      }
+      edgeTiles.sort((a, b) => a.col - b.col || a.row - b.row);
+      for (let i = edgeTiles.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [edgeTiles[i], edgeTiles[j]] = [edgeTiles[j], edgeTiles[i]]; }
+
+      const groupCenters = [];
+      for (const tile of edgeTiles) {
+        if (groupCenters.length >= 6) break;
+        let nearRoad = false;
+        for (let dc = -2; dc <= 2 && !nearRoad; dc++) for (let dr = -2; dr <= 2 && !nearRoad; dr++) if (isRoad(tile.col + dc, tile.row + dr)) nearRoad = true;
+        if (nearRoad) continue;
+        if (groupCenters.some(p => (p.col - tile.col) ** 2 + (p.row - tile.row) ** 2 < 16)) continue;
+        groupCenters.push(tile);
+      }
+
+      const placed = new Set();
+      for (const center of groupCenters) {
+        const count = 8 + Math.floor(rand() * 5);
+        const candidates = [];
+        for (let dc = -3; dc <= 3; dc++) for (let dr = -3; dr <= 3; dr++) {
+          const c = center.col + dc, r = center.row + dr, k = `${c},${r}`;
+          if (!tileSet.has(k) || placed.has(k) || isWater(c, r) || isRoad(c, r)) continue;
+          candidates.push({ col: c, row: r });
+        }
+        for (let i = candidates.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [candidates[i], candidates[j]] = [candidates[j], candidates[i]]; }
+        let n = 0;
+        for (const t of candidates) { if (n >= count) break; placed.add(`${t.col},${t.row}`); decorations.add(`${t.col},${t.row}`); n++; }
+      }
+    }
+  }
+
+  // ── Blossom trees in Creative Quarter (seed 3141) ──
+  {
+    const rand = sceneRng(3141);
+    const tiles = districtTiles.get('creative');
+    if (tiles && tiles.size > 0) {
+      const tileSet = new Set(tiles);
+      const bounds = districtBounds['creative'];
+      const midRow = bounds ? bounds.centerRow : 28;
+      const topEdgeTiles = [];
+      for (const k of tiles) {
+        const [c, r] = k.split(',').map(Number);
+        if (r > midRow) continue;
+        if (isWater(c, r) || isRoad(c, r)) continue;
+        const isEdge = !tileSet.has(`${c - 1},${r}`) || !tileSet.has(`${c + 1},${r}`) || !tileSet.has(`${c},${r - 1}`) || !tileSet.has(`${c},${r + 1}`);
+        if (isEdge) topEdgeTiles.push({ col: c, row: r });
+      }
+      topEdgeTiles.sort((a, b) => a.col - b.col || a.row - b.row);
+      for (let i = topEdgeTiles.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [topEdgeTiles[i], topEdgeTiles[j]] = [topEdgeTiles[j], topEdgeTiles[i]]; }
+
+      const groupCenters = [];
+      for (const tile of topEdgeTiles) {
+        if (groupCenters.length >= 5) break;
+        let nearRoad = false;
+        for (let dc = -2; dc <= 2 && !nearRoad; dc++) for (let dr = -2; dr <= 2 && !nearRoad; dr++) if (isRoad(tile.col + dc, tile.row + dr)) nearRoad = true;
+        if (nearRoad) continue;
+        if (groupCenters.some(p => (p.col - tile.col) ** 2 + (p.row - tile.row) ** 2 < 9)) continue;
+        groupCenters.push(tile);
+      }
+
+      const placed = new Set();
+      for (const center of groupCenters) {
+        const count = 6 + Math.floor(rand() * 5);
+        const candidates = [];
+        for (let dc = -3; dc <= 3; dc++) for (let dr = -3; dr <= 3; dr++) {
+          const c = center.col + dc, r = center.row + dr, k = `${c},${r}`;
+          if (!tileSet.has(k) || placed.has(k) || isWater(c, r) || isRoad(c, r)) continue;
+          candidates.push({ col: c, row: r });
+        }
+        for (let i = candidates.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [candidates[i], candidates[j]] = [candidates[j], candidates[i]]; }
+        let n = 0;
+        for (const t of candidates) { if (n >= count) break; placed.add(`${t.col},${t.row}`); decorations.add(`${t.col},${t.row}`); n++; }
+      }
+    }
+  }
+
+  // ── Fountain at Town Square center ──
+  if (districtBounds['townsquare']) {
+    const b = districtBounds['townsquare'];
+    decorations.add(`${Math.round(b.centerCol)},${Math.round(b.centerRow)}`);
+  }
+
+  // ── Fishing boats at fixed positions ──
+  decorations.add('48,14');
+  decorations.add('48,16');
+
+  return decorations;
+}
+
 /* ── Main ────────────────────────────────────────────────────────────── */
 
 console.log('Generating world map (56x56 grid, 6 districts)...');
@@ -299,6 +480,9 @@ console.log(`  Water: ${waterTiles.size} tiles`);
 const roadAdjacent = computeRoadAdjacency(tileLookup, roadTiles);
 console.log(`  Road-adjacent: ${roadAdjacent.size} tiles`);
 
+const decorationTiles = computeDecorationTiles(districtTiles, districtBounds, roadTiles, waterTiles);
+console.log(`  Decorations: ${decorationTiles.size} tiles`);
+
 // Build output
 const districts = {};
 for (const d of ALL_DISTRICTS) {
@@ -307,7 +491,7 @@ for (const d of ALL_DISTRICTS) {
 }
 
 const output = {
-  version: 1,
+  version: 2,
   gridCols: GRID_COLS,
   gridRows: GRID_ROWS,
   generatedAt: new Date().toISOString(),
@@ -315,6 +499,7 @@ const output = {
   roads: [...roadTiles].sort(),
   water: [...waterTiles].sort(),
   roadAdjacent: [...roadAdjacent].sort(),
+  decorations: [...decorationTiles].sort(),
   districts,
   districtBounds,
   districtDefs: ALL_DISTRICTS.map(d => ({

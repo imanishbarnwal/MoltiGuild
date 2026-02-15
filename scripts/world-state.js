@@ -52,6 +52,7 @@ function loadDistrictMap() {
     water: new Set(raw.water),
     worldMask: new Set(raw.worldMask),
     roadAdjacent: new Set(raw.roadAdjacent),
+    decorations: new Set(raw.decorations || []),
     districts: {},
     districtBounds: raw.districtBounds,
     districtDefs: raw.districtDefs,
@@ -136,6 +137,7 @@ function isBuildable(plotId) {
   if (!map.worldMask.has(plotId)) return false;
   if (map.roads.has(plotId)) return false;
   if (map.water.has(plotId)) return false;
+  if (map.decorations.has(plotId)) return false;
   return true;
 }
 

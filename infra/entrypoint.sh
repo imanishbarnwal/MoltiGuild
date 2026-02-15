@@ -14,6 +14,16 @@ cp -r /app/agents/writer ~/.openclaw/agents/ 2>/dev/null || true
 cp -r /app/agents/director ~/.openclaw/agents/ 2>/dev/null || true
 cp /app/openclaw.config.json ~/.openclaw/openclaw.json 2>/dev/null || true
 
+# Also update workspace SOUL.md (OpenClaw reads from workspace, not agents dir)
+for agent_dir in /app/agents/*/; do
+    agent_name=$(basename "$agent_dir")
+    ws_dir="$HOME/.openclaw/workspace-${agent_name}"
+    if [ -d "$ws_dir" ] && [ -f "${agent_dir}SOUL.md" ]; then
+        cp "${agent_dir}SOUL.md" "${ws_dir}/SOUL.md"
+        echo "[agents] Updated ${agent_name} workspace SOUL.md"
+    fi
+done
+
 # ── VERIFY OPENCLAW REPO ─────────────────
 
 if [ ! -d "/app/openclaw-repo" ]; then
