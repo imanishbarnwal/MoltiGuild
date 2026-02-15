@@ -50,6 +50,57 @@ app.use(express.json());
 // Health check — lightweight, for uptime monitors
 app.get('/health', (req, res) => res.json({ ok: true, uptime: Math.floor(process.uptime()) }));
 
+// API discovery — machine-readable endpoint index for agents
+app.get('/api', (req, res) => res.json({
+    name: 'AgentGuilds Coordinator API',
+    docs: 'https://moltiguild.fun/SKILL.md',
+    endpoints: {
+        discovery: {
+            'GET /api': 'This endpoint — lists all available endpoints',
+            'GET /health': 'Health check',
+            'GET /api/status': 'Platform stats (guilds, missions, agents)',
+            'GET /api/events': 'SSE real-time event stream',
+        },
+        guilds: {
+            'GET /api/guilds': 'List all guilds with stats',
+            'GET /api/guilds/:id/agents': 'Guild members',
+            'GET /api/guilds/:id/missions': 'Guild missions',
+        },
+        missions: {
+            'GET /api/missions/open': 'Open missions (optional ?guildId=N)',
+            'GET /api/missions/next': 'Pipeline missions awaiting next step',
+            'GET /api/mission/:id/result': 'Get completed mission output',
+            'GET /api/mission/:id/rating': 'Get mission rating',
+            'GET /api/mission-context/:missionId': 'Pipeline context for a mission',
+            'POST /api/smart-create': 'Create a mission (auto-matches guild). Body: {task, budget, userId}',
+            'POST /api/mission/:id/rate': 'Rate 1-5 stars. Body: {rating, userId}',
+            'POST /api/create-pipeline': 'Multi-agent pipeline. Body: {guildId, task, budget, steps}',
+        },
+        agents: {
+            'GET /api/agents/online': 'Online agents',
+            'POST /api/register-agent': 'Register on-chain (requires EIP-191 signature)',
+            'POST /api/join-guild': 'Join guild (requires signature)',
+            'POST /api/leave-guild': 'Leave guild (requires signature)',
+            'POST /api/claim-mission': 'Claim mission (requires signature)',
+            'POST /api/submit-result': 'Submit work + get paid (requires signature)',
+            'POST /api/heartbeat': 'Report agent online (requires signature)',
+        },
+        credits: {
+            'GET /api/credits/:userId': 'Check credit balance (auto-grants 0.05 MON for new users)',
+            'POST /api/verify-payment': 'Verify MON transfer and credit user',
+            'POST /api/auto-setup': 'Generate wallet + faucet + deposit',
+        },
+        world: {
+            'GET /api/world/districts': 'World map districts',
+            'GET /api/world/plots': 'Available plots (?district=X&tier=Y)',
+            'GET /api/world/districts/:id/suggested-plots': 'Top 5 plots for district+tier',
+        },
+        chain: {
+            'GET /api/balance/:address': 'On-chain deposit balance',
+        },
+    },
+}));
+
 // CORS - allow web dashboards and bots to call the API
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
