@@ -169,6 +169,19 @@ export default function StatsSidebar({ open }: StatsSidebarProps) {
       >
         ~{missionsRemaining} missions remaining
       </div>
+      {missionsRemaining < 10 && (
+        <div
+          style={{
+            fontFamily: "'Crimson Pro', serif",
+            fontSize: 12,
+            color: 'var(--ember)',
+            fontStyle: 'italic',
+            marginBottom: 8,
+          }}
+        >
+          Send MON to coordinator to top up
+        </div>
+      )}
 
       {/* On-Chain Balance */}
       {isWallet ? (

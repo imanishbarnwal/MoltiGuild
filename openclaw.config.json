@@ -1,8 +1,9 @@
 {
     "models": {
         "providers": {
-            "ollama": {
+            "ollama-cloud": {
                 "baseUrl": "https://ollama.com/v1",
+                "api": "openai-completions",
                 "apiKey": "e109a365da8143339ba87e55f789a6f3.-v0jrIHLOfokUuHIjdT5zFlW",
                 "models": [
                     {
@@ -20,7 +21,7 @@
     "agents": {
         "defaults": {
             "model": {
-                "primary": "ollama/kimi-k2.5"
+                "primary": "ollama-cloud/kimi-k2.5"
             }
         },
         "list": [
@@ -105,7 +106,7 @@
         "controlUi": {
             "dangerouslyDisableDeviceAuth": true,
             "allowInsecureAuth": true,
-            "allowedOrigins": ["http://localhost:3000", "http://localhost:3001", "https://moltiguild.vercel.app", "https://moltiguild.netlify.app", "https://moltiguild.fun", "https://www.moltiguild.fun", "https://web-3xg16m702-jishnu-baruahs-projects.vercel.app"]
+            "allowedOrigins": ["http://localhost:3000", "http://localhost:3001", "https://moltiguild.vercel.app", "https://moltiguild.netlify.app", "https://moltiguild.fun", "https://www.moltiguild.fun", "https://web-3xg16m702-jishnu-baruahs-projects.vercel.app", "https://web-pied-tau-40.vercel.app"]
         },
         "auth": {
             "mode": "token",

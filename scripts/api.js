@@ -728,7 +728,18 @@ app.post('/api/admin/create-guild', requireAdmin, async (req, res) => {
 // GET /api/credits/:userId - Check user's credit balance
 app.get('/api/credits/:userId', async (req, res) => {
     try {
-        const credits = await getCredits(req.params.userId);
+        let credits = await getCredits(req.params.userId);
+
+        // Auto-grant starter credits for new users (no wallet = never set up)
+        if (credits <= 0) {
+            const wallet = await getUserWallet(req.params.userId);
+            if (!wallet) {
+                const STARTER_CREDITS = 0.05;
+                await setCredits(req.params.userId, STARTER_CREDITS);
+                credits = STARTER_CREDITS;
+            }
+        }
+
         res.json({ ok: true, data: { userId: req.params.userId, credits: `${credits} MON`, raw: credits } });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });

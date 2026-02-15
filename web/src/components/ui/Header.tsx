@@ -10,8 +10,8 @@ interface HeaderProps {
 }
 
 export default function Header({ onToggleSidebar, onBack, showBack }: HeaderProps) {
-  const { data: credits } = useCredits();
-  const displayBalance = credits ? credits.raw.toFixed(4) : '0.0000';
+  const { data: credits, isLoading: creditsLoading } = useCredits();
+  const displayBalance = creditsLoading ? '...' : (credits ? credits.raw.toFixed(4) : '0.0000');
 
   return (
     <header

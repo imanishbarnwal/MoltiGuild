@@ -808,7 +808,7 @@ export default function ChatBar({ expanded, onToggle }: ChatBarProps) {
               rating={ratings[msg.id] ?? msg.rating ?? 0}
               hoveredStar={hoveredStar}
               onStarHover={setHoveredStar}
-              onRate={star => handleRate(msg.id, star, msg.missionId)}
+              onRate={star => handleRate(msg.id, star, msg.missionId ?? extractResultMissionId(msg) ?? undefined)}
               onCopy={() => handleCopy(msg.id, msg.text)}
               isCopied={copiedId === msg.id}
             />
@@ -1065,6 +1065,33 @@ function StreamingBubble({ text, blocks }: { text: string; blocks: ChatContentBl
 
 /* ── Message bubble ───────────────────────────────────────────────── */
 
+/** Extract missionId from an assistant message's tool result blocks that contain a mission result. */
+function extractResultMissionId(msg: ChatMessage): number | null {
+  if (!msg.blocks) return null;
+  for (const b of msg.blocks) {
+    if (b.type !== 'tool_result' || !b.toolResult) continue;
+    const raw = typeof b.toolResult === 'string' ? (() => { try { return JSON.parse(b.toolResult as string); } catch { return null; } })() : b.toolResult;
+    if (!raw || typeof raw !== 'object') continue;
+    const obj = raw as Record<string, unknown>;
+    // A result-fetching response has both `result` and `missionId`
+    if (obj.result && obj.missionId != null) return Number(obj.missionId);
+  }
+  // Also check if the coordinator text mentions rating and a mission ID
+  if (msg.text) {
+    const rateMatch = msg.text.match(/[Rr]at(?:e|ing)\s+(?:this|the|quest|mission)\s*[#]?(\d+)/i);
+    if (rateMatch) return Number(rateMatch[1]);
+    // "Rate this? (1-5 stars)" pattern — grab last mentioned mission ID
+    if (/rate\s+this/i.test(msg.text)) {
+      const allIds = msg.text.match(/(?:mission|quest|Mission|Quest)\s*#?(\d+)/gi);
+      if (allIds && allIds.length > 0) {
+        const last = allIds[allIds.length - 1].match(/(\d+)/);
+        if (last) return Number(last[1]);
+      }
+    }
+  }
+  return null;
+}
+
 function MessageBubble({
   message, rating, hoveredStar, onStarHover, onRate, onCopy, isCopied,
 }: {
@@ -1121,6 +1148,10 @@ function MessageBubble({
       }
     }
 
+    // Detect if this assistant message contains a mission result worth rating
+    const resultMissionId = extractResultMissionId(message);
+    const showRating = resultMissionId != null;
+
     return (
       <div
         style={{ position: 'relative' }}
@@ -1128,7 +1159,7 @@ function MessageBubble({
         onMouseLeave={() => setHovered(false)}
       >
         <div style={{
-          borderLeft: '3px solid var(--indigo)',
+          borderLeft: `3px solid ${showRating ? 'var(--verdigris)' : 'var(--indigo)'}`,
           background: 'var(--walnut-light)', padding: '12px 14px',
           borderRadius: 2, marginLeft: 12,
         }}>
@@ -1156,6 +1187,45 @@ function MessageBubble({
               color: 'var(--parchment)', lineHeight: 1.5,
             }}>
               {renderMarkdown(message.text)}
+            </div>
+          )}
+
+          {/* Star rating for assistant messages containing mission results */}
+          {showRating && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 4,
+              marginTop: 10, paddingTop: 8,
+              borderTop: '1px solid var(--walnut-border)',
+            }}>
+              <span style={{
+                fontFamily: "'Cinzel', serif", fontSize: 11,
+                color: 'var(--parchment-dim)', marginRight: 4,
+                letterSpacing: '0.05em',
+              }}>Rate quest #{resultMissionId}:</span>
+              {[1, 2, 3, 4, 5].map(star => {
+                const filled = star <= (hoveredStar || rating);
+                return (
+                  <span key={star}
+                    onClick={() => onRate(star)}
+                    onMouseEnter={() => onStarHover(star)}
+                    onMouseLeave={() => onStarHover(0)}
+                    style={{
+                      cursor: rating > 0 ? 'default' : 'pointer', fontSize: 18,
+                      color: filled ? 'var(--gold)' : 'var(--walnut-border)',
+                      textShadow: filled ? '0 0 4px var(--glow-gold)' : 'none',
+                      transition: 'all 100ms ease',
+                      transform: hoveredStar === star ? 'scale(1.15)' : 'scale(1)',
+                      display: 'inline-block',
+                    }}
+                  >{filled ? '\u2605' : '\u2606'}</span>
+                );
+              })}
+              {rating > 0 && (
+                <span style={{
+                  fontFamily: "'Crimson Pro', serif", fontSize: 11,
+                  color: 'var(--verdigris)', marginLeft: 6, fontStyle: 'italic',
+                }}>Rated!</span>
+              )}
             </div>
           )}
         </div>
