@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useStats, useCredits, useSSEFeed, useOnlineAgents, useUser, useContractBalance, useDepositFunds, useWithdrawFunds } from '@/lib/hooks';
 import { timeAgo, truncateAddress } from '@/lib/utils';
 import { formatEther } from 'viem';
-import { EXPLORER_URL } from '@/lib/constants';
+import { EXPLORER_URL, IS_MAINNET } from '@/lib/constants';
 import type { FeedEvent } from '@/lib/world-state';
 
 interface StatsSidebarProps {
@@ -176,10 +176,10 @@ export default function StatsSidebar({ open }: StatsSidebarProps) {
             fontSize: 12,
             color: 'var(--ember)',
             fontStyle: 'italic',
-            marginBottom: 8,
+            marginBottom: 4,
           }}
         >
-          Send MON to coordinator to top up
+          {IS_MAINNET ? 'Deposit MON to fund missions' : 'Send MON to coordinator to top up'}
         </div>
       )}
 

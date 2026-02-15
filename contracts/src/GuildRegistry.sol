@@ -71,6 +71,9 @@ contract GuildRegistry {
     
     uint256 public missionTimeout;
 
+    // V5: Buyback treasury
+    address public buybackTreasury;
+
     // =========================
     // EVENTS
     // =========================
@@ -130,6 +133,9 @@ contract GuildRegistry {
     event MissionClaimed(uint256 indexed missionId, address indexed agent);
     event FundsDeposited(address indexed user, uint256 amount);
     event FundsWithdrawn(address indexed user, uint256 amount);
+
+    // V5 Events
+    event BuybackTreasurySet(address indexed oldTreasury, address indexed newTreasury);
 
     modifier onlyCoordinator() {
         require(msg.sender == coordinator, "Not coordinator");
@@ -457,14 +463,18 @@ contract GuildRegistry {
             require(claimerIncluded, "Claimed agent must be in recipients");
         }
 
-        uint256 totalSplit = 0;
+        // V5: Calculate fee split (85% agents, 10% coordinator, 5% buyback)
+        uint256 buybackFee = mission.budget * 5 / 100;
+        uint256 protocolFee = mission.budget * 10 / 100;
+        uint256 agentPool = mission.budget - protocolFee - buybackFee;
 
+        // Verify splits don't exceed agent pool
+        uint256 totalSplit = 0;
         for (uint256 i = 0; i < splits.length; i++) {
             require(recipients[i] != address(0), "Zero recipient");
             unchecked { totalSplit += splits[i]; }
         }
-
-        require(totalSplit <= mission.budget, "Splits exceed budget");
+        require(totalSplit <= agentPool, "Splits exceed agent pool");
 
         mission.completed = true;
         mission.completedAt = block.timestamp;
@@ -472,21 +482,25 @@ contract GuildRegistry {
 
         guilds[mission.guildId].acceptedMissions++;
 
-        uint256 fee = mission.budget - totalSplit;
-        if (fee > 0) {
-            totalFeesCollected += fee;
+        // Protocol fee (coordinator keeps remainder if splits < agentPool)
+        uint256 coordinatorFee = protocolFee + (agentPool - totalSplit);
+        totalFeesCollected += coordinatorFee;
+
+        // V5: Send buyback fee to treasury
+        if (buybackTreasury != address(0) && buybackFee > 0) {
+            (bool bbSuccess, ) = payable(buybackTreasury).call{value: buybackFee}("");
+            require(bbSuccess, "Buyback transfer failed");
+        } else {
+            totalFeesCollected += buybackFee;
         }
 
+        // Pay agents
         for (uint256 i = 0; i < recipients.length; i++) {
-            uint256 amount = splits[i];
-            
-            // Update agent stats if recipient is a registered agent
             if (agents[recipients[i]].active) {
                 agents[recipients[i]].missionsCompleted++;
             }
-
-            if (amount > 0) {
-                (bool success, ) = recipients[i].call{value: amount}("");
+            if (splits[i] > 0) {
+                (bool success, ) = recipients[i].call{value: splits[i]}("");
                 require(success, "Transfer failed");
             }
         }
@@ -568,6 +582,12 @@ contract GuildRegistry {
         coordinator = newCoordinator;
 
         emit CoordinatorTransferred(oldCoordinator, newCoordinator);
+    }
+
+    function setBuybackTreasury(address _treasury) external onlyCoordinator {
+        address old = buybackTreasury;
+        buybackTreasury = _treasury;
+        emit BuybackTreasurySet(old, _treasury);
     }
 
     // =========================

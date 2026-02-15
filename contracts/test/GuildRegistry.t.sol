@@ -340,7 +340,7 @@ contract GuildRegistryTest is Test {
         address[] memory recipients = new address[](1);
         recipients[0] = agent1; // Claimer included
         uint256[] memory splits = new uint256[](1);
-        splits[0] = 1 ether;
+        splits[0] = 0.85 ether; // v5: max 85% to agents
 
         vm.prank(coordinator);
         registry.completeMission(missionId, results, recipients, splits);
@@ -369,10 +369,92 @@ contract GuildRegistryTest is Test {
         address[] memory recipients = new address[](1);
         recipients[0] = agent2; // Claimer (agent1) NOT included
         uint256[] memory splits = new uint256[](1);
-        splits[0] = 1 ether;
+        splits[0] = 0.85 ether; // v5: max 85%
 
         vm.prank(coordinator);
         vm.expectRevert("Claimed agent must be in recipients");
         registry.completeMission(missionId, results, recipients, splits);
+    }
+
+    // =========================
+    // V5: BUYBACK TREASURY TESTS
+    // =========================
+
+    function test_SetBuybackTreasury() public {
+        address treasury = makeAddr("treasury");
+        vm.prank(coordinator);
+        registry.setBuybackTreasury(treasury);
+        assertEq(registry.buybackTreasury(), treasury);
+    }
+
+    function test_SetBuybackTreasury_Revert_NotCoordinator() public {
+        vm.prank(randomUser);
+        vm.expectRevert("Not coordinator");
+        registry.setBuybackTreasury(makeAddr("treasury"));
+    }
+
+    function test_CompleteMission_FeeSplit_85_10_5() public {
+        address treasury = makeAddr("treasury");
+        vm.prank(coordinator);
+        registry.setBuybackTreasury(treasury);
+
+        vm.prank(agent1);
+        registry.registerAgent("Agent", 0);
+        vm.prank(randomUser);
+        registry.createGuild("Guild", "Tech");
+        vm.prank(agent1);
+        registry.joinGuild(0);
+
+        vm.prank(client);
+        uint256 missionId = registry.createMission{value: 1 ether}(0, bytes32("task1"));
+        vm.prank(agent1);
+        registry.claimMission(missionId);
+
+        uint256 agentBefore = agent1.balance;
+        uint256 treasuryBefore = treasury.balance;
+        uint256 feesBefore = registry.totalFeesCollected();
+
+        bytes32[] memory results = new bytes32[](1);
+        results[0] = bytes32("result");
+        address[] memory recipients = new address[](1);
+        recipients[0] = agent1;
+        uint256[] memory splits = new uint256[](1);
+        splits[0] = 0.85 ether;
+
+        vm.prank(coordinator);
+        registry.completeMission(missionId, results, recipients, splits);
+
+        assertEq(agent1.balance, agentBefore + 0.85 ether);
+        assertEq(treasury.balance, treasuryBefore + 0.05 ether);
+        assertEq(registry.totalFeesCollected(), feesBefore + 0.10 ether);
+    }
+
+    function test_CompleteMission_NoTreasury_CoordinatorGetsAll() public {
+        vm.prank(agent1);
+        registry.registerAgent("Agent", 0);
+        vm.prank(randomUser);
+        registry.createGuild("Guild", "Tech");
+        vm.prank(agent1);
+        registry.joinGuild(0);
+
+        vm.prank(client);
+        uint256 missionId = registry.createMission{value: 1 ether}(0, bytes32("task1"));
+        vm.prank(agent1);
+        registry.claimMission(missionId);
+
+        uint256 feesBefore = registry.totalFeesCollected();
+
+        bytes32[] memory results = new bytes32[](1);
+        results[0] = bytes32("result");
+        address[] memory recipients = new address[](1);
+        recipients[0] = agent1;
+        uint256[] memory splits = new uint256[](1);
+        splits[0] = 0.85 ether;
+
+        vm.prank(coordinator);
+        registry.completeMission(missionId, results, recipients, splits);
+
+        // Coordinator gets 10% + 5% buyback (no treasury set)
+        assertEq(registry.totalFeesCollected(), feesBefore + 0.15 ether);
     }
 }

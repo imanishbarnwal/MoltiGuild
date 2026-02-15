@@ -86,9 +86,13 @@ app.get('/api', (req, res) => res.json({
             'POST /api/heartbeat': 'Report agent online (requires signature)',
         },
         credits: {
-            'GET /api/credits/:userId': 'Check credit balance (auto-grants 0.05 MON for new users)',
+            'GET /api/credits/:userId': 'Check credit balance',
             'POST /api/verify-payment': 'Verify MON transfer and credit user',
-            'POST /api/auto-setup': 'Generate wallet + faucet + deposit',
+            'POST /api/auto-setup': 'Generate wallet + faucet + deposit (testnet only)',
+        },
+        treasury: {
+            'GET /api/treasury': 'Buyback treasury balance and $GUILD token info',
+            'POST /api/admin/buyback': 'Check treasury status for manual buyback (admin)',
         },
         world: {
             'GET /api/world/districts': 'World map districts',
@@ -283,7 +287,12 @@ async function autoSetupUser(userId) {
     wallet = { address: account.address, key: privateKey };
     await saveUserWallet(userId, wallet);
 
-    // Faucet
+    // On mainnet: no faucet, no auto-deposit — user must fund via wallet
+    if (monad.IS_MAINNET) {
+        return { alreadySetup: false, address: account.address, credits: 0, funded: false, mainnet: true };
+    }
+
+    // Faucet (testnet only)
     let faucetOk = false;
     try {
         const fRes = await fetch(FAUCET_URL, {
@@ -608,7 +617,7 @@ app.post('/api/submit-result', requireAuth('submit-result'), async (req, res) =>
             const allHashes = pipeline.contributors.map(c => c.resultHash);
             const allAgents = pipeline.contributors.map(c => c.agent);
             const budget = (await monad.readContract('getMission', [BigInt(mid)])).budget;
-            const agentPool = (budget * 90n) / 100n; // 90% to agents
+            const agentPool = (budget * 85n) / 100n; // 85% to agents (v5: 10% coord + 5% buyback)
             const perAgent = agentPool / BigInt(allAgents.length); // equal split
 
             // On-chain claim is by first agent; coordinator completes with all splits
@@ -656,7 +665,7 @@ app.post('/api/submit-result', requireAuth('submit-result'), async (req, res) =>
         }
 
         const budget = mission.budget;
-        const agentSplit = (budget * 90n) / 100n;
+        const agentSplit = (budget * 85n) / 100n; // v5: 85% agent, 10% coord, 5% buyback
 
         const txResult = await monad.completeMission(mid, [resultHash], [claimer], [agentSplit]);
 
@@ -781,8 +790,8 @@ app.get('/api/credits/:userId', async (req, res) => {
     try {
         let credits = await getCredits(req.params.userId);
 
-        // Auto-grant starter credits for new users (no wallet = never set up)
-        if (credits <= 0) {
+        // Auto-grant starter credits for new users (testnet only)
+        if (credits <= 0 && !monad.IS_MAINNET) {
             const wallet = await getUserWallet(req.params.userId);
             if (!wallet) {
                 const STARTER_CREDITS = 0.05;
@@ -791,7 +800,7 @@ app.get('/api/credits/:userId', async (req, res) => {
             }
         }
 
-        res.json({ ok: true, data: { userId: req.params.userId, credits: `${credits} MON`, raw: credits } });
+        res.json({ ok: true, data: { userId: req.params.userId, credits: `${credits} MON`, raw: credits, mainnet: monad.IS_MAINNET } });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
     }
@@ -898,6 +907,59 @@ app.post('/api/admin/add-credits', requireAdmin, async (req, res) => {
 });
 
 // ═══════════════════════════════════════
+// TREASURY & BUYBACK (V5 MAINNET)
+// ═══════════════════════════════════════
+
+// GET /api/treasury — Show buyback treasury balance
+app.get('/api/treasury', async (req, res) => {
+    try {
+        const treasuryAddress = process.env.BUYBACK_TREASURY;
+        if (!treasuryAddress) return res.json({ ok: true, data: { balance: '0', address: null, enabled: false } });
+
+        const client = monad.getPublicClient();
+        const balance = await client.getBalance({ address: treasuryAddress });
+
+        res.json({
+            ok: true,
+            data: {
+                address: treasuryAddress,
+                balance: monad.formatEther(balance),
+                balanceWei: balance.toString(),
+                enabled: true,
+                guildToken: process.env.GUILD_TOKEN_ADDRESS || null,
+            },
+        });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// POST /api/admin/buyback — Check treasury status for manual buyback
+app.post('/api/admin/buyback', requireAdmin, async (req, res) => {
+    try {
+        const treasuryAddress = process.env.BUYBACK_TREASURY;
+        if (!treasuryAddress) return res.status(400).json({ ok: false, error: 'BUYBACK_TREASURY not configured' });
+
+        const client = monad.getPublicClient();
+        const balance = await client.getBalance({ address: treasuryAddress });
+
+        res.json({
+            ok: true,
+            data: {
+                treasury: treasuryAddress,
+                balance: monad.formatEther(balance),
+                message: balance > 0n
+                    ? `Treasury has ${monad.formatEther(balance)} MON ready for buyback. Run: node scripts/buyback.js`
+                    : 'Treasury is empty. Fees accumulate after mission completions.',
+                guildToken: process.env.GUILD_TOKEN_ADDRESS || null,
+            },
+        });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// ═══════════════════════════════════════
 // SMART GUILD MATCHING
 // ═══════════════════════════════════════
 
@@ -920,6 +982,12 @@ app.post('/api/smart-create', async (req, res) => {
 
             // Auto-setup if no credits
             if (credits < parseFloat(missionBudget)) {
+                if (monad.IS_MAINNET) {
+                    return res.status(402).json({
+                        ok: false,
+                        error: `Insufficient credits (${credits} MON). Deposit MON via the web UI or send to ${COORDINATOR_ADDRESS} and verify with /api/verify-payment`,
+                    });
+                }
                 const setup = await autoSetupUser(userId);
                 credits = setup.credits || 0;
                 if (credits < parseFloat(missionBudget)) {

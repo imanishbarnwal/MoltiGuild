@@ -8,11 +8,16 @@
 
 **Tech Stack:** Solidity 0.8.27 + Foundry (contract), Node.js + Express + viem (API), Next.js 14 + wagmi + RainbowKit (frontend), Goldsky (indexer), Render (API hosting), Vercel (frontend hosting).
 
-**Prerequisites the human must provide before starting:**
-- Monad mainnet chain ID and RPC URL
+**Monad Mainnet Config (confirmed):**
+- **Chain ID:** 143
+- **RPC:** https://rpc.monad.xyz
+- **Explorer:** https://monad.socialscan.io
+- **EVM:** Prague (Solidity 0.8.27+ — already compatible)
+- **$GUILD Token:** 0x01511c69DB6f00Fa88689bd4bcdfb13D97847777
+
+**Prerequisites the human must still provide:**
 - Funded coordinator wallet private key on mainnet
 - Buyback treasury wallet address (can be a fresh EOA)
-- Monad mainnet explorer URL
 
 ---
 

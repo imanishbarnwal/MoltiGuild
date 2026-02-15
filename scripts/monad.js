@@ -21,19 +21,20 @@ const CHAIN_ID = parseInt(process.env.CHAIN_ID || '10143');
 const GUILD_REGISTRY_ADDRESS = process.env.GUILD_REGISTRY_ADDRESS || '0x60395114FB889C62846a574ca4Cda3659A95b038';
 const COORDINATOR_PRIVATE_KEY = process.env.COORDINATOR_PRIVATE_KEY;
 const GOLDSKY_ENDPOINT = process.env.GOLDSKY_ENDPOINT || 'https://api.goldsky.com/api/public/project_cmlgbdp3o5ldb01uv0nu66cer/subgraphs/agentguilds-monad-testnet-monad-testnet/v5/gn';
-const EXPLORER_URL = 'https://testnet.socialscan.io/tx/';
-const FAUCET_URL = 'https://agents.devnads.com/v1/faucet';
+const EXPLORER_URL = process.env.EXPLORER_URL || 'https://testnet.socialscan.io/tx/';
+const FAUCET_URL = process.env.FAUCET_URL || 'https://agents.devnads.com/v1/faucet';
+const IS_MAINNET = CHAIN_ID !== 10143;
 
-// Monad testnet chain definition
-const monadTestnet = {
+// Chain definition (dynamic based on env)
+const monadChain = {
     id: CHAIN_ID,
-    name: 'Monad Testnet',
+    name: IS_MAINNET ? 'Monad' : 'Monad Testnet',
     nativeCurrency: { name: 'MON', symbol: 'MON', decimals: 18 },
     rpcUrls: {
         default: { http: [MONAD_RPC] },
     },
     blockExplorers: {
-        default: { name: 'Socialscan', url: 'https://testnet.socialscan.io' },
+        default: { name: 'Explorer', url: EXPLORER_URL.replace(/\/tx\/$/, '') },
     },
 };
 
@@ -46,6 +47,8 @@ const GUILD_REGISTRY_ABI = [
     { name: 'coordinator', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'address' }] },
     { name: 'guildCount', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
     { name: 'totalFeesCollected', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
+    { name: 'buybackTreasury', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'address' }] },
+    { name: 'setBuybackTreasury', type: 'function', stateMutability: 'nonpayable', inputs: [{ name: '_treasury', type: 'address' }], outputs: [] },
     { name: 'getMissionCount', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
     { name: 'getAgentCount', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
     { name: 'getAgentList', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'address[]' }] },
@@ -233,7 +236,7 @@ let _walletClient = null;
 function getPublicClient() {
     if (!_publicClient) {
         _publicClient = createPublicClient({
-            chain: monadTestnet,
+            chain: monadChain,
             transport: http(MONAD_RPC),
         });
     }
@@ -249,7 +252,7 @@ function getWalletClient() {
         const account = privateKeyToAccount(key);
         _walletClient = createWalletClient({
             account,
-            chain: monadTestnet,
+            chain: monadChain,
             transport: http(MONAD_RPC),
         });
     }
@@ -782,7 +785,12 @@ module.exports = {
     GOLDSKY_ENDPOINT,
     EXPLORER_URL,
     GUILD_REGISTRY_ABI,
-    monadTestnet,
+    FAUCET_URL,
+    CHAIN_ID,
+    MONAD_RPC,
+    IS_MAINNET,
+    monadChain,
+    monadTestnet: monadChain, // backwards compat
 
     // Clients
     getPublicClient,

@@ -10,13 +10,20 @@ contract DeployGuildRegistry is Script {
         
         vm.startBroadcast(deployerPrivateKey);
         
-        address coordinator = 0xf7D8E04f82d343B68a7545FF632e282B502800Fd;
-        
+        address coordinator = vm.envOr("COORDINATOR_ADDRESS", address(0xf7D8E04f82d343B68a7545FF632e282B502800Fd));
+
         GuildRegistry registry = new GuildRegistry(coordinator);
-        
+
+        // V5: Set buyback treasury if provided
+        address treasury = vm.envOr("BUYBACK_TREASURY", address(0));
+        if (treasury != address(0)) {
+            registry.setBuybackTreasury(treasury);
+            console.log("Buyback Treasury:", treasury);
+        }
+
         console.log("GuildRegistry deployed at:", address(registry));
         console.log("Coordinator:", registry.coordinator());
-        
+
         vm.stopBroadcast();
         
         return registry;

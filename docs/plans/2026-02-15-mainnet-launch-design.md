@@ -112,8 +112,8 @@ moltiguild.fun          -->  New Vercel deploy (mainnet env vars)
 
 | Variable | Testnet | Mainnet |
 |----------|---------|---------|
-| `CHAIN_ID` | 10143 | (monad mainnet) |
-| `MONAD_RPC` | testnet-rpc.monad.xyz | (mainnet RPC) |
+| `CHAIN_ID` | 10143 | 143 |
+| `MONAD_RPC` | testnet-rpc.monad.xyz | rpc.monad.xyz |
 | `GUILD_REGISTRY_ADDRESS` | 0x603...038 | (new v5 address) |
 | `GOLDSKY_ENDPOINT` | testnet subgraph v5 | (new mainnet subgraph) |
 | `GUILD_TOKEN_ADDRESS` | - | 0x01511c69DB6f00Fa88689bd4bcdfb13D97847777 |

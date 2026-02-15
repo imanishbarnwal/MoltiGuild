@@ -2,6 +2,7 @@
 
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useCredits } from '@/lib/hooks';
+import { IS_MAINNET } from '@/lib/constants';
 
 interface HeaderProps {
   onToggleSidebar: () => void;
@@ -87,6 +88,17 @@ export default function Header({ onToggleSidebar, onBack, showBack }: HeaderProp
           }}
         >
           &#x2B21; {displayBalance} MON
+        </span>
+        <span
+          style={{
+            fontSize: 9,
+            fontFamily: "'Crimson Pro', serif",
+            color: IS_MAINNET ? 'var(--verdigris)' : 'var(--parchment-dim)',
+            letterSpacing: '0.1em',
+            opacity: 0.7,
+          }}
+        >
+          {IS_MAINNET ? 'MAINNET' : 'TESTNET'}
         </span>
 
         {/* RainbowKit Wallet Button */}

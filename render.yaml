@@ -52,6 +52,44 @@ services:
         sync: false
 
   # ═══════════════════════════════════════
+  # Coordinator API — MAINNET
+  # ═══════════════════════════════════════
+  - type: web
+    name: moltiguild-api-mainnet
+    runtime: docker
+    dockerfilePath: deploy/api/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /api/status
+    envVars:
+      - key: COORDINATOR_PRIVATE_KEY
+        sync: false
+      - key: ADMIN_API_KEY
+        sync: false
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: MONAD_RPC
+        value: https://rpc.monad.xyz
+      - key: CHAIN_ID
+        value: "143"
+      - key: GUILD_REGISTRY_ADDRESS
+        sync: false  # v5 mainnet address (set after deploy)
+      - key: GOLDSKY_ENDPOINT
+        sync: false  # mainnet subgraph (set after deploy)
+      - key: EXPLORER_URL
+        value: "https://monad.socialscan.io/tx/"
+      - key: BUYBACK_TREASURY
+        value: "0x129aaaB806bc3f829e2cc4cC2Ac758e76974Ae6A"
+      - key: GUILD_TOKEN_ADDRESS
+        value: "0x01511c69DB6f00Fa88689bd4bcdfb13D97847777"
+      - key: DATA_DIR
+        value: /app/data
+
+  # ═══════════════════════════════════════
   # Agent: Reviewer (Guild 0) — deploy manually as Web Service
   # Agent: Creator (Guild 1)  — deploy manually as Web Service
   # See README.md for env vars. Uses deploy/agent/Dockerfile

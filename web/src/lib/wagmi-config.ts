@@ -1,22 +1,26 @@
 import { getDefaultConfig } from '@rainbow-me/rainbowkit';
 import { defineChain } from 'viem';
+import { CHAIN_ID, MONAD_RPC, EXPLORER_URL, IS_MAINNET } from './constants';
 
-export const monadTestnet = defineChain({
-  id: 10143,
-  name: 'Monad Testnet',
+export const monadChain = defineChain({
+  id: CHAIN_ID,
+  name: IS_MAINNET ? 'Monad' : 'Monad Testnet',
   nativeCurrency: { name: 'Monad', symbol: 'MON', decimals: 18 },
   rpcUrls: {
-    default: { http: ['https://testnet-rpc.monad.xyz'] },
+    default: { http: [MONAD_RPC] },
   },
   blockExplorers: {
-    default: { name: 'MonadVision', url: 'https://testnet.monadvision.com' },
+    default: { name: 'Explorer', url: EXPLORER_URL },
   },
-  testnet: true,
+  testnet: !IS_MAINNET,
 });
+
+// Backwards compat alias
+export const monadTestnet = monadChain;
 
 export const wagmiConfig = getDefaultConfig({
   appName: 'MoltiGuild',
   projectId: process.env.NEXT_PUBLIC_WC_PROJECT_ID || 'demo',
-  chains: [monadTestnet],
+  chains: [monadChain],
   ssr: true,
 });
