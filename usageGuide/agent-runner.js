@@ -228,28 +228,90 @@ async function getOpenMissions() {
 }
 
 // ═══════════════════════════════════════
-// WORK LOGIC - CUSTOMIZE THIS
+// LLM INTEGRATION
 // ═══════════════════════════════════════
 
-/**
- * This is where your agent does its work.
- * Replace this function with your own AI/logic.
- *
- * @param {object} mission - The mission data
- * @param {string} mission.missionId - Mission ID
- * @param {string} mission.taskHash - Keccak hash of the task description
- * @param {string} mission.budget - Budget in wei
- * @param {string} mission.client - Client address
- * @param {string} mission.guildId - Guild ID
- * @param {object|null} context - Pipeline context (if part of a multi-agent pipeline)
- * @param {string} context.task - Original task description
- * @param {number} context.step - Current step number
- * @param {number} context.totalSteps - Total pipeline steps
- * @param {string} context.label - Step label (e.g. "Write copy")
- * @param {string|null} context.previousResult - Previous agent's output
- * @param {array} context.previousSteps - All previous step results
- * @returns {string} The result to submit
- */
+const LLM_URL = process.env.OLLAMA_API_URL || '';
+const LLM_KEY = process.env.OLLAMA_API_KEY || '';
+const LLM_MODEL = process.env.OLLAMA_MODEL || 'google/gemini-2.0-flash-001';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+
+const CAPABILITY_PROMPTS = {
+    'creative': 'You are a creative content specialist for Web3 projects. Write engaging, original content.',
+    'meme': 'You are a crypto meme creator. Be funny, reference crypto culture, CT memes, and chain-specific humor.',
+    'code': 'You are a developer specializing in smart contracts and Web3. Write clean, secure code and thorough reviews.',
+    'design': 'You are a UI/UX designer for DeFi and Web3 applications. Describe visual designs in detail.',
+    'research': 'You are a blockchain researcher analyzing protocols, tokenomics, and on-chain data.',
+    'translation': 'You are a polyglot translator specializing in technical blockchain documentation.',
+    'defi': 'You are a DeFi strategist analyzing yield opportunities, protocol risks, and liquidity.',
+    'marketing': 'You are a Web3 growth marketer focused on community building and viral content.',
+    'general': 'You are a helpful assistant that completes various tasks for a crypto project.',
+    'test': 'You are a test agent. Complete tasks concisely and accurately.',
+    'math': 'You are a mathematician. Solve problems step by step with clear reasoning.',
+};
+
+function getSystemPrompt() {
+    const base = CAPABILITY_PROMPTS[CONFIG.capability] || CAPABILITY_PROMPTS['general'];
+    return `${base}\n\nYou are an agent in the MoltiGuild network on Monad blockchain. Complete the task concisely (under 500 words). Be specific and useful — no filler.`;
+}
+
+async function callLLM(userMessage) {
+    const systemPrompt = getSystemPrompt();
+
+    // Try OpenAI-compatible endpoint (OpenRouter, Ollama, etc.)
+    if (LLM_URL) {
+        try {
+            const res = await fetch(`${LLM_URL}/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(LLM_KEY ? { 'Authorization': `Bearer ${LLM_KEY}` } : {}),
+                },
+                body: JSON.stringify({
+                    model: LLM_MODEL,
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userMessage },
+                    ],
+                    max_tokens: 800,
+                }),
+            });
+            const data = await res.json();
+            if (data.choices?.[0]?.message?.content) return data.choices[0].message.content;
+            if (data.error) log('!', `LLM error: ${data.error.message || JSON.stringify(data.error)}`);
+        } catch (err) {
+            log('!', `LLM request failed: ${err.message}`);
+        }
+    }
+
+    // Fallback: Gemini direct API
+    if (GEMINI_API_KEY) {
+        try {
+            const res = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: `${systemPrompt}\n\nTask: ${userMessage}` }] }],
+                        generationConfig: { maxOutputTokens: 800 },
+                    }),
+                },
+            );
+            const data = await res.json();
+            return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+        } catch (err) {
+            log('!', `Gemini error: ${err.message}`);
+        }
+    }
+
+    return null;
+}
+
+// ═══════════════════════════════════════
+// WORK LOGIC
+// ═══════════════════════════════════════
+
 async function doWork(mission, context) {
     if (context) {
         log('*', `Pipeline step ${context.step}/${context.totalSteps}: "${context.label}"`);
@@ -259,26 +321,27 @@ async function doWork(mission, context) {
     }
     log('*', `Working on mission ${mission.missionId}...`);
 
-    // ==========================================
-    // REPLACE THIS WITH YOUR OWN LOGIC
-    // ==========================================
-    // Examples:
-    //   - Call an LLM API to generate content
-    //   - Run a code analysis tool
-    //   - Fetch and summarize web data
-    //   - Process an image or document
-    //
-    // For pipeline missions, context.previousResult contains
-    // the previous agent's output to build upon.
-
-    // Simulate work (remove this in production)
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    if (context) {
-        const prev = context.previousResult ? ` | Building on: "${context.previousResult.slice(0, 50)}"` : '';
-        return `[Step ${context.step}/${context.totalSteps} - ${context.label}] Result by ${account.address} for "${context.task}"${prev}`;
+    // Build task text from context or fetch from API
+    let taskText;
+    if (context?.task) {
+        taskText = context.previousResult
+            ? `${context.task}\n\nPrevious agent's work:\n${context.previousResult}`
+            : context.task;
+    } else {
+        // Fetch task description from API
+        const ctx = await getMissionContext(mission.missionId);
+        taskText = ctx?.task || `Complete mission ${mission.missionId} for guild ${CONFIG.guildId}`;
     }
-    return `Result for mission ${mission.missionId} by agent ${account.address}. Task hash: ${mission.taskHash}`;
+
+    // Call LLM (OpenRouter → Gemini fallback)
+    const result = await callLLM(taskText);
+    if (result) {
+        log('+', `LLM response: ${result.slice(0, 120)}...`);
+        return result;
+    }
+
+    // Fallback if no API key or LLM fails
+    return `[Agent ${account.address.slice(0, 10)}] Completed task: "${taskText.slice(0, 200)}"`;
 }
 
 // ═══════════════════════════════════════

@@ -3,7 +3,7 @@
         "providers": {
             "ollama": {
                 "baseUrl": "https://ollama.com/v1",
-                "apiKey": "8794f40c337a424ba82ea35df2aac2bf.PStbY6puC93px9EymmI0Ul8n",
+                "apiKey": "e109a365da8143339ba87e55f789a6f3.-v0jrIHLOfokUuHIjdT5zFlW",
                 "models": [
                     {
                         "id": "gpt-oss:120b",
@@ -105,7 +105,7 @@
         "controlUi": {
             "dangerouslyDisableDeviceAuth": true,
             "allowInsecureAuth": true,
-            "allowedOrigins": ["http://localhost:3000", "http://localhost:3001", "https://moltiguild.vercel.app", "https://moltiguild.netlify.app"]
+            "allowedOrigins": ["http://localhost:3000", "http://localhost:3001", "https://moltiguild.vercel.app", "https://moltiguild.netlify.app", "https://moltiguild.fun", "https://www.moltiguild.fun", "https://web-3xg16m702-jishnu-baruahs-projects.vercel.app"]
         },
         "auth": {
             "mode": "token",

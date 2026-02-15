@@ -130,6 +130,24 @@ async function savePipelines(data) {
     saveJSONFile('pipelines.json', data);
 }
 
+// Mission task descriptions (missionId → task text)
+async function getMissionTasks() {
+    if (redis) return (await redis.get('mission-tasks')) || {};
+    return loadJSONFile('mission-tasks.json');
+}
+
+async function saveMissionTask(missionId, task) {
+    if (redis) {
+        const tasks = (await redis.get('mission-tasks')) || {};
+        tasks[String(missionId)] = task;
+        await redis.set('mission-tasks', tasks);
+    } else {
+        const tasks = loadJSONFile('mission-tasks.json');
+        tasks[String(missionId)] = task;
+        saveJSONFile('mission-tasks.json', tasks);
+    }
+}
+
 async function getPipelineCounter() {
     if (redis) return (await redis.get('pipeline:counter')) || 0;
     return Object.keys(loadJSONFile('pipelines.json')).length;
@@ -311,6 +329,24 @@ function requireAuth(action) {
 // POST ENDPOINTS (authenticated)
 // ═══════════════════════════════════════
 
+// POST /api/register-agent - Register agent on-chain
+app.post('/api/register-agent', requireAuth('register-agent'), async (req, res) => {
+    try {
+        const { capability, priceWei } = req.body;
+        if (!capability) return res.status(400).json({ ok: false, error: 'Missing capability' });
+        const price = priceWei || '1000000000000000'; // default 0.001 MON
+
+        const result = await monad.registerAgentWithWallet(req.agentAddress, capability, price);
+        broadcast('agent_registered', { agent: req.agentAddress, capability, priceWei: price, ...result });
+        res.json({ ok: true, agent: req.agentAddress, capability, ...result });
+    } catch (err) {
+        if (err.message?.includes('already registered')) {
+            return res.json({ ok: true, agent: req.agentAddress, alreadyRegistered: true });
+        }
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
 // POST /api/heartbeat
 app.post('/api/heartbeat', requireAuth('heartbeat'), async (req, res) => {
     try {
@@ -420,6 +456,7 @@ app.post('/api/create-pipeline', async (req, res) => {
             createdAt: new Date().toISOString(),
         };
         await savePipelines(pipelines);
+        await saveMissionTask(missionId, task);
 
         broadcast('pipeline_created', { pipelineId, missionId, guildId: gid, task, totalSteps: steps.length, budget });
         res.json({
@@ -639,6 +676,7 @@ app.post('/api/admin/create-mission', requireAdmin, async (req, res) => {
         const missionCount = Number(await monad.readContract('getMissionCount'));
         const missionId = missionCount - 1;
 
+        await saveMissionTask(missionId, task);
         broadcast('mission_created', { missionId, guildId: parseInt(guildId), task, budget });
         res.json({ ok: true, data: { missionId, guildId: parseInt(guildId), task, taskHash, budget: `${budget} MON`, ...txResult } });
     } catch (err) {
@@ -848,6 +886,7 @@ app.post('/api/smart-create', async (req, res) => {
         const missionCount = Number(await monad.readContract('getMissionCount'));
         const missionId = missionCount - 1;
 
+        await saveMissionTask(missionId, task);
         broadcast('mission_created', { missionId, guildId, task, budget: missionBudget });
         res.json({
             ok: true,
@@ -918,6 +957,7 @@ app.post('/api/smart-pipeline', requireAdmin, async (req, res) => {
             createdAt: new Date().toISOString(),
         };
         await savePipelines(pipelines);
+        await saveMissionTask(missionId, task);
 
         broadcast('pipeline_created', { pipelineId, missionId, guildId: gid, task, totalSteps: steps.length, budget });
         res.json({
@@ -1039,7 +1079,14 @@ app.get('/api/mission-context/:missionId', async (req, res) => {
             });
         }
 
-        res.json({ ok: true, data: null }); // Not part of a pipeline
+        // Not a pipeline — check for stored standalone task description
+        const tasks = await getMissionTasks();
+        const taskText = tasks[String(missionId)];
+        if (taskText) {
+            return res.json({ ok: true, data: { task: taskText } });
+        }
+
+        res.json({ ok: true, data: null }); // No context available
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
     }

@@ -149,7 +149,7 @@ async function callLLM(systemPrompt, userMessage) {
   if (CONFIG.geminiKey) {
     try {
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${CONFIG.geminiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${CONFIG.geminiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -328,8 +328,8 @@ class Agent {
 
           await this.claimMission(mission.missionId);
 
-          // Get task description from API
-          let taskText = `Mission ${mission.missionId}`;
+          // Get task description from API (works for standalone + pipeline missions)
+          let taskText = `Complete mission ${mission.missionId} for guild ${this.guildId}`;
           try {
             const ctx = await fetch(`${CONFIG.apiUrl}/api/mission-context/${mission.missionId}`);
             const ctxData = await ctx.json();
