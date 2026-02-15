@@ -1411,20 +1411,24 @@ app.post('/api/world/auto-assign', async (req, res) => {
 
         const releaseFirst = req.body?.releaseAll === true;
         const guilds = await monad.getGuildLeaderboard();
-        const allAssignments = worldState.getAllAssignments();
 
         // Release all if requested
         let released = 0;
         if (releaseFirst) {
-            for (const [plotId, assignment] of allAssignments) {
-                worldState.releasePlot(plotId, assignment.guildId);
-                released++;
+            const allAssignments = worldState.getAllAssignments();
+            for (const [gId, plots] of Object.entries(allAssignments)) {
+                for (const plot of plots) {
+                    worldState.releasePlot(plot.plotId, Number(gId));
+                    released++;
+                }
             }
         }
 
         // Find unassigned guilds
         const assignedGuilds = new Set();
-        for (const a of worldState.getAllAssignments().values()) assignedGuilds.add(a.guildId);
+        for (const [gId, plots] of Object.entries(worldState.getAllAssignments())) {
+            if (plots.length > 0) assignedGuilds.add(Number(gId));
+        }
 
         let assigned = 0, failed = 0;
         const results = [];
