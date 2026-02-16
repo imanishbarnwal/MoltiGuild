@@ -8,9 +8,10 @@ import GuildCard from '@/components/ui/GuildCard';
 import PlotDeed from '@/components/ui/PlotDeed';
 import GuildCreateModal from '@/components/ui/GuildCreateModal';
 import AgentRegisterModal from '@/components/ui/AgentRegisterModal';
+import DepositModal from '@/components/ui/DepositModal';
 import { useGuildVisuals } from '@/lib/hooks';
 
-type ActiveModal = 'none' | 'guild-create' | 'agent-register';
+type ActiveModal = 'none' | 'guild-create' | 'agent-register' | 'deposit';
 
 export default function UIOverlay() {
   const guildVisuals = useGuildVisuals();
@@ -103,6 +104,7 @@ export default function UIOverlay() {
         onToggleSidebar={() => setSidebarOpen(prev => !prev)}
         onBack={handleBack}
         showBack={inDistrict}
+        onOpenDeposit={() => setActiveModal('deposit')}
       />
 
       {/* Sidebar */}
@@ -155,6 +157,13 @@ export default function UIOverlay() {
       {/* Agent Register Modal */}
       {activeModal === 'agent-register' && (
         <AgentRegisterModal
+          onClose={() => setActiveModal('none')}
+        />
+      )}
+
+      {/* Deposit Modal */}
+      {activeModal === 'deposit' && (
+        <DepositModal
           onClose={() => setActiveModal('none')}
         />
       )}

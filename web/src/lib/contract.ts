@@ -1,4 +1,4 @@
-import { GUILD_REGISTRY_ADDRESS } from './constants';
+import { getNetwork } from './network';
 
 export const GUILD_REGISTRY_ABI = [
   // Views
@@ -95,7 +95,9 @@ export const GUILD_REGISTRY_ABI = [
   { name: 'FundsWithdrawn', type: 'event', inputs: [{ name: 'user', type: 'address', indexed: true }, { name: 'amount', type: 'uint256' }] },
 ] as const;
 
-export const guildRegistryConfig = {
-  address: GUILD_REGISTRY_ADDRESS as `0x${string}`,
-  abi: GUILD_REGISTRY_ABI,
-} as const;
+export function getGuildRegistryConfig() {
+  return {
+    address: getNetwork().contractAddress as `0x${string}`,
+    abi: GUILD_REGISTRY_ABI,
+  } as const;
+}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther } from 'viem';
 import * as api from './api';
@@ -9,7 +9,8 @@ import { getUserId } from './user';
 import { subscribeSSE, sseToFeedEvent, type SSEEvent } from './sse';
 import type { FeedEvent, GuildVisual } from './world-state';
 import { getGuildTier, getGuildPosition } from './world-state';
-import { guildRegistryConfig } from './contract';
+import { getGuildRegistryConfig } from './contract';
+import { useNetworkKey, useNetwork } from './network';
 
 /* ── User Identity ──────────────────────────────────────────────── */
 
@@ -27,20 +28,38 @@ export function useUser() {
 
 export function useCredits() {
   const { userId } = useUser();
-  return useQuery({
-    queryKey: ['credits', userId],
+  const netKey = useNetworkKey();
+  const network = useNetwork();
+  const queryClient = useQueryClient();
+  const claimedRef = useRef(false);
+
+  const query = useQuery({
+    queryKey: ['credits', netKey, userId],
     queryFn: () => api.fetchCredits(userId),
     enabled: !!userId,
     refetchInterval: 30_000,
     placeholderData: { userId: '', credits: '0 MON', raw: 0 },
   });
+
+  // On testnet, auto-claim starter credits if balance is 0
+  useEffect(() => {
+    if (!network.isMainnet && query.data && query.data.raw <= 0 && userId && !claimedRef.current) {
+      claimedRef.current = true;
+      api.claimStarter(userId).then(() => {
+        queryClient.invalidateQueries({ queryKey: ['credits'] });
+      }).catch(() => {});
+    }
+  }, [network.isMainnet, query.data, userId, queryClient]);
+
+  return query;
 }
 
 /* ── Platform Stats ─────────────────────────────────────────────── */
 
 export function useStats() {
+  const netKey = useNetworkKey();
   return useQuery({
-    queryKey: ['status'],
+    queryKey: ['status', netKey],
     queryFn: api.fetchStatus,
     refetchInterval: 15_000,
     placeholderData: {
@@ -56,8 +75,9 @@ export function useStats() {
 /* ── Guilds ──────────────────────────────────────────────────────── */
 
 export function useGuilds() {
+  const netKey = useNetworkKey();
   return useQuery({
-    queryKey: ['guilds'],
+    queryKey: ['guilds', netKey],
     queryFn: async () => {
       const { guilds } = await api.fetchGuilds();
       return guilds;
@@ -209,7 +229,7 @@ export function useSmartCreate() {
     mutationFn: ({ task, budget }: { task: string; budget?: string }) =>
       api.smartCreate(task, userId, budget),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['credits', userId] });
+      queryClient.invalidateQueries({ queryKey: ['credits'] });
       queryClient.invalidateQueries({ queryKey: ['status'] });
     },
   });
@@ -229,7 +249,7 @@ export function useAutoSetup() {
   return useMutation({
     mutationFn: () => api.autoSetup(userId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['credits', userId] });
+      queryClient.invalidateQueries({ queryKey: ['credits'] });
     },
   });
 }
@@ -251,7 +271,7 @@ export function useCreateGuild() {
 export function useContractBalance() {
   const { address } = useAccount();
   return useReadContract({
-    ...guildRegistryConfig,
+    ...getGuildRegistryConfig(),
     functionName: 'userBalances',
     args: address ? [address] : undefined,
     query: {
@@ -269,14 +289,14 @@ export function useDepositFunds() {
 
   useEffect(() => {
     if (isSuccess) {
-      queryClient.invalidateQueries({ queryKey: ['credits', userId] });
+      queryClient.invalidateQueries({ queryKey: ['credits'] });
       queryClient.invalidateQueries({ queryKey: ['contract-balance'] });
     }
   }, [isSuccess, queryClient, userId]);
 
   const deposit = (amount: string) => {
     writeContract({
-      ...guildRegistryConfig,
+      ...getGuildRegistryConfig(),
       functionName: 'depositFunds',
       value: parseEther(amount),
     });
@@ -293,14 +313,14 @@ export function useWithdrawFunds() {
 
   useEffect(() => {
     if (isSuccess) {
-      queryClient.invalidateQueries({ queryKey: ['credits', userId] });
+      queryClient.invalidateQueries({ queryKey: ['credits'] });
       queryClient.invalidateQueries({ queryKey: ['contract-balance'] });
     }
   }, [isSuccess, queryClient, userId]);
 
   const withdraw = (amount: string) => {
     writeContract({
-      ...guildRegistryConfig,
+      ...getGuildRegistryConfig(),
       functionName: 'withdrawFunds',
       args: [parseEther(amount)],
     });

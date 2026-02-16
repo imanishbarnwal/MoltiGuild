@@ -1,4 +1,4 @@
-import { API_BASE_URL } from './constants';
+import { getNetwork } from './network';
 import type { FeedEvent } from './world-state';
 
 export type SSEEventType =
@@ -42,7 +42,7 @@ const EVENT_TYPES: SSEEventType[] = [
 export function connectSSE(): void {
   if (eventSource) return;
 
-  const url = `${API_BASE_URL}/api/events`;
+  const url = `${getNetwork().apiUrl}/api/events`;
   eventSource = new EventSource(url);
 
   eventSource.onopen = () => {

@@ -489,6 +489,9 @@ export class TilemapManager {
       const cell = this.screenToGrid(pointer.worldX, pointer.worldY);
       if (!cell) return;
 
+      // Block clicks on decoration tiles (mountains, lava, trees, ponds, etc.)
+      if (this.decorationTiles.has(`${cell.col},${cell.row}`)) return;
+
       const district = this.tileLookup.get(`${cell.col},${cell.row}`);
       if (district) this.onDistrictClick(district);
     });

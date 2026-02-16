@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { useGuildVisuals, useGuilds, useStats } from '@/lib/hooks';
+import { useNetwork } from '@/lib/network';
 import type { WorldState } from '@/lib/world-state';
 
 const PhaserGame = dynamic(() => import('@/components/PhaserGame'), {
@@ -110,6 +111,7 @@ function RoleOverlay({
   progress: number;
   onChooseHuman: () => void;
 }) {
+  const network = useNetwork();
   const [fadeOut, setFadeOut] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [hovered, setHovered] = useState<'human' | 'agent' | null>(null);
@@ -467,7 +469,7 @@ function RoleOverlay({
         color: 'rgba(138, 127, 106, 0.3)',
         letterSpacing: '0.05em',
       }}>
-        Monad Testnet
+        {network.isMainnet ? 'Monad' : 'Monad Testnet'}
       </div>
     </div>
   );

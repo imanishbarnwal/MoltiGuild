@@ -5,7 +5,7 @@ import { useSmartCreate, useRateMission, useMissionResult, useUser } from '@/lib
 import { useOpenClawConnection, useOpenClawChat, buildSessionKey } from '@/lib/openclaw-hooks';
 import { subscribeSSE, sseToFeedEvent } from '@/lib/sse';
 import { truncateAddress, timeAgo } from '@/lib/utils';
-import { EXPLORER_URL } from '@/lib/constants';
+import { getNetwork } from '@/lib/network';
 import type { ChatMessage, ContentBlock } from '@/lib/utils';
 import type { ChatContentBlock } from '@/lib/openclaw-client';
 
@@ -610,7 +610,7 @@ export default function ChatBar({ expanded, onToggle }: ChatBarProps) {
     setQuickActionsVisible(false);
 
     if (isConnected) {
-      openClaw.send(task);
+      openClaw.send(`[network:${getNetwork().key}] ${task}`);
     } else {
       addMessage({ role: 'system', text: 'Scribe offline \u2014 dispatching quest directly...' });
       smartCreate.mutate(
@@ -1340,7 +1340,7 @@ function MessageBubble({
       )}
       {message.txHash && (
         <a
-          href={`${EXPLORER_URL}/tx/${message.txHash}`}
+          href={`${getNetwork().explorerUrl}/tx/${message.txHash}`}
           target="_blank" rel="noopener noreferrer" className="font-mono"
           style={{
             display: 'block', fontSize: 11, color: 'var(--indigo)',

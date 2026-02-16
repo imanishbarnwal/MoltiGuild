@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useStats, useCredits, useSSEFeed, useOnlineAgents, useUser, useContractBalance, useDepositFunds, useWithdrawFunds } from '@/lib/hooks';
 import { timeAgo, truncateAddress } from '@/lib/utils';
 import { formatEther } from 'viem';
-import { EXPLORER_URL, IS_MAINNET } from '@/lib/constants';
+import { useNetwork } from '@/lib/network';
 import type { FeedEvent } from '@/lib/world-state';
 
 interface StatsSidebarProps {
@@ -51,6 +51,7 @@ export default function StatsSidebar({ open }: StatsSidebarProps) {
   const { data: onlineAgents } = useOnlineAgents();
   const { isWallet } = useUser();
   const feed = useSSEFeed();
+  const network = useNetwork();
 
   const onlineCount = onlineAgents?.length ?? 0;
   const balance = credits ? credits.raw.toFixed(4) : '0.0000';
@@ -179,7 +180,7 @@ export default function StatsSidebar({ open }: StatsSidebarProps) {
             marginBottom: 4,
           }}
         >
-          {IS_MAINNET ? 'Deposit MON to fund missions' : 'Send MON to coordinator to top up'}
+          {network.isMainnet ? 'Deposit MON to fund missions' : 'Send MON to coordinator to top up'}
         </div>
       )}
 
@@ -210,6 +211,7 @@ function OnChainWallet() {
   const { data: rawBalance } = useContractBalance();
   const depositHook = useDepositFunds();
   const withdrawHook = useWithdrawFunds();
+  const network = useNetwork();
 
   const [mode, setMode] = useState<'idle' | 'deposit' | 'withdraw'>('idle');
   const [amount, setAmount] = useState('');
@@ -329,7 +331,7 @@ function OnChainWallet() {
         <TxStatus color="var(--verdigris)">
           Confirmed{' '}
           <a
-            href={`${EXPLORER_URL}/tx/${txHash}`}
+            href={`${network.explorerUrl}/tx/${txHash}`}
             target="_blank"
             rel="noopener noreferrer"
             className="font-mono"

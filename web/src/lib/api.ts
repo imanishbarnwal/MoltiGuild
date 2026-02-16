@@ -1,4 +1,4 @@
-import { API_BASE_URL } from './constants';
+import { getNetwork } from './network';
 
 /* ── Response wrapper ───────────────────────────────────────────── */
 
@@ -9,7 +9,7 @@ interface ApiResponse<T> {
 }
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
+  const res = await fetch(`${getNetwork().apiUrl}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -179,6 +179,12 @@ export const verifyPayment = (txHash: string, userId: string) =>
     method: 'POST',
     body: JSON.stringify({ txHash, userId }),
   });
+
+export const claimStarter = (userId: string) =>
+  apiFetch<CreditsData & { granted?: boolean; alreadyClaimed?: boolean; spent?: boolean }>(
+    '/api/claim-starter',
+    { method: 'POST', body: JSON.stringify({ userId }) },
+  );
 
 export const adminCreateGuild = (name: string, category: string, adminKey: string) =>
   apiFetch<GuildCreateResult>('/api/admin/create-guild', {

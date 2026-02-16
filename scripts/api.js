@@ -785,22 +785,40 @@ app.post('/api/admin/create-guild', requireAdmin, async (req, res) => {
 // USER CREDITS ENDPOINTS
 // ═══════════════════════════════════════
 
-// GET /api/credits/:userId - Check user's credit balance
+// GET /api/credits/:userId - Check user's credit balance (read-only, no side effects)
 app.get('/api/credits/:userId', async (req, res) => {
     try {
-        let credits = await getCredits(req.params.userId);
+        const credits = await getCredits(req.params.userId);
+        res.json({ ok: true, data: { userId: req.params.userId, credits: `${credits} MON`, raw: credits, mainnet: monad.IS_MAINNET } });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
 
-        // Auto-grant starter credits for new users (testnet only)
-        if (credits <= 0 && !monad.IS_MAINNET) {
-            const wallet = await getUserWallet(req.params.userId);
-            if (!wallet) {
-                const STARTER_CREDITS = 0.05;
-                await setCredits(req.params.userId, STARTER_CREDITS);
-                credits = STARTER_CREDITS;
-            }
+// POST /api/claim-starter - Grant starter credits (testnet only, one-time)
+app.post('/api/claim-starter', async (req, res) => {
+    try {
+        const { userId } = req.body;
+        if (!userId) return res.status(400).json({ ok: false, error: 'userId required' });
+
+        if (monad.IS_MAINNET) {
+            return res.status(403).json({ ok: false, error: 'Mainnet requires MON deposit. Use the deposit flow in the web UI.' });
         }
 
-        res.json({ ok: true, data: { userId: req.params.userId, credits: `${credits} MON`, raw: credits, mainnet: monad.IS_MAINNET } });
+        const credits = await getCredits(userId);
+        if (credits > 0) {
+            return res.json({ ok: true, data: { userId, credits: `${credits} MON`, raw: credits, alreadyClaimed: true } });
+        }
+
+        const wallet = await getUserWallet(userId);
+        if (wallet) {
+            return res.json({ ok: true, data: { userId, credits: '0 MON', raw: 0, spent: true } });
+        }
+
+        const STARTER_CREDITS = 0.05;
+        await setCredits(userId, STARTER_CREDITS);
+        console.log(`[claim-starter] Granted ${STARTER_CREDITS} MON to new user ${userId}`);
+        res.json({ ok: true, data: { userId, credits: `${STARTER_CREDITS} MON`, raw: STARTER_CREDITS, granted: true } });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
     }

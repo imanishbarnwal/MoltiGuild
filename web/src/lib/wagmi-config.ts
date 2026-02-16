@@ -1,26 +1,39 @@
 import { getDefaultConfig } from '@rainbow-me/rainbowkit';
 import { defineChain } from 'viem';
-import { CHAIN_ID, MONAD_RPC, EXPLORER_URL, IS_MAINNET } from './constants';
+import { NETWORKS } from './network';
 
-export const monadChain = defineChain({
-  id: CHAIN_ID,
-  name: IS_MAINNET ? 'Monad' : 'Monad Testnet',
+export const monadMainnet = defineChain({
+  id: NETWORKS.mainnet.chainId,
+  name: 'Monad',
   nativeCurrency: { name: 'Monad', symbol: 'MON', decimals: 18 },
   rpcUrls: {
-    default: { http: [MONAD_RPC] },
+    default: { http: [NETWORKS.mainnet.rpc] },
   },
   blockExplorers: {
-    default: { name: 'Explorer', url: EXPLORER_URL },
+    default: { name: 'Explorer', url: NETWORKS.mainnet.explorerUrl },
   },
-  testnet: !IS_MAINNET,
+  testnet: false,
+});
+
+export const monadTestnet = defineChain({
+  id: NETWORKS.testnet.chainId,
+  name: 'Monad Testnet',
+  nativeCurrency: { name: 'Monad', symbol: 'MON', decimals: 18 },
+  rpcUrls: {
+    default: { http: [NETWORKS.testnet.rpc] },
+  },
+  blockExplorers: {
+    default: { name: 'Explorer', url: NETWORKS.testnet.explorerUrl },
+  },
+  testnet: true,
 });
 
 // Backwards compat alias
-export const monadTestnet = monadChain;
+export const monadChain = monadMainnet;
 
 export const wagmiConfig = getDefaultConfig({
   appName: 'MoltiGuild',
   projectId: process.env.NEXT_PUBLIC_WC_PROJECT_ID || 'demo',
-  chains: [monadChain],
+  chains: [monadMainnet, monadTestnet],
   ssr: true,
 });
