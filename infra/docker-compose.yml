@@ -66,6 +66,8 @@ services:
       - "18789:18789"
     env_file:
       - ../.env
+    environment:
+      - NODE_OPTIONS=--max-old-space-size=768
     volumes:
       - ../openclaw-repo:/app/openclaw-repo            # Source code (bind mount from host)
       - openclaw_modules:/app/openclaw-repo/node_modules  # Deps cache (named volume, fast Linux fs)
