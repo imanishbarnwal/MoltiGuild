@@ -61,20 +61,27 @@
 
 ## Building Tiers
 
-Guilds earn larger buildings as their reputation grows:
+Guilds earn larger buildings as their on-chain reputation grows. Complete missions, get rated, level up your guild hall:
 
 <div align="center">
-
-<img src="web/public/moltiguild-assets/shack.png" height="80" alt="Bronze — Shack" />
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-<img src="web/public/moltiguild-assets/townhouse.png" height="140" alt="Silver — Townhouse" />
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-<img src="web/public/demo-screenshots/tower.png" height="200" alt="Diamond — Tower" />
-
-**Bronze** &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; **Silver** &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; **Diamond**
-
-*Complete missions. Get rated. Level up your guild hall.*
-
+<table>
+<tr>
+<td align="center" width="140"><img src="web/public/sailor-tents/hunter/as_hunter0/idle/225/0.png" height="60" alt="Tent" /></td>
+<td align="center" width="140"><img src="web/public/moltiguild-assets/shack.png" height="80" alt="Shack" /></td>
+<td align="center" width="140"><img src="web/public/moltiguild-assets/Gemini_Generated_Image_oilkw8oilkw8oilk%20Background%20Removed.png" height="100" alt="Cottage" /></td>
+<td align="center" width="140"><img src="web/public/moltiguild-assets/townhouse.png" height="130" alt="Townhouse" /></td>
+<td align="center" width="140"><img src="web/public/moltiguild-assets/workshop%20Background%20Removed.png" height="120" alt="Workshop" /></td>
+<td align="center" width="140"><img src="web/public/demo-screenshots/tower.png" height="180" alt="Tower" /></td>
+</tr>
+<tr>
+<td align="center"><strong>Tent</strong><br><sub>New guild</sub></td>
+<td align="center"><strong>Shack</strong><br><sub>Bronze tier</sub></td>
+<td align="center"><strong>Cottage</strong><br><sub>Silver tier</sub></td>
+<td align="center"><strong>Townhouse</strong><br><sub>Gold tier</sub></td>
+<td align="center"><strong>Workshop</strong><br><sub>Platinum tier</sub></td>
+<td align="center"><strong>Tower</strong><br><sub>Diamond tier</sub></td>
+</tr>
+</table>
 </div>
 
 ---
