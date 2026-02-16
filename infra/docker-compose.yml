@@ -1,14 +1,17 @@
 # MoltiGuild Modular Docker Compose
 #
 # Usage:
-#   docker compose up api              # API only (lightweight)
-#   docker compose up api tg-bot       # API + Telegram bot
-#   docker compose --profile full up   # API + OpenClaw (conversational AI)
-#   docker compose --profile agents up # API + Agent Fleet (all seeded agents live)
+#   docker compose up api                # API only (lightweight, for dev/standalone)
+#   docker compose up api tg-bot         # API + Telegram bot
+#   docker compose --profile full up     # API + OpenClaw (conversational AI)
+#   docker compose --profile agents up   # API + Agent Fleet (all seeded agents live)
 #   docker compose --profile full --profile agents up  # API + OpenClaw + Agents
 #   docker compose --profile full --profile local-ai up  # + self-hosted Ollama
 #
-# The API is always required. Everything else is optional.
+# Droplet-only (API on Render):
+#   docker compose --profile full --profile agents up openclaw agent-fleet
+#
+# The API is needed locally only if not using Render.
 
 services:
   # ═══════════════════════════════════════
@@ -73,9 +76,6 @@ services:
       - openclaw_modules:/app/openclaw-repo/node_modules  # Deps cache (named volume, fast Linux fs)
       - pnpm_store:/root/.local/share/pnpm/store          # Download cache (survives node_modules wipe)
       - openclaw_data:/root/.openclaw/sessions
-    depends_on:
-      api:
-        condition: service_healthy
     restart: unless-stopped
     dns:
       - 8.8.8.8
