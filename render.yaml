@@ -79,7 +79,7 @@ services:
       - key: GUILD_REGISTRY_ADDRESS
         value: "0xD72De456b2Aa5217a4Fd2E4d64443Ac92FA28791"
       - key: GOLDSKY_ENDPOINT
-        sync: false  # mainnet subgraph (set after deploy)
+        value: "https://api.goldsky.com/api/public/project_cmlpa4v2etj0n01vjc1nubxuw/subgraphs/agentguilds-mainnet-monad/v1/gn"
       - key: EXPLORER_URL
         value: "https://monad.socialscan.io/tx/"
       - key: BUYBACK_TREASURY
